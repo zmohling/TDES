@@ -76,10 +76,9 @@ $(LIB_DIR)/libgmock_main.a: $(BUILD_DIR)/gmock_main.o | $(LIB_DIR)
 
 # Directory creation
 $(LIB_DIR):
-	@$(ECHO) Creating library files... 
+	@$(ECHO) Creating external libraries... 
 	@$(MKDIR) $(LIB_DIR) 
 
 $(BUILD_DIR):
 	@$(ECHO) Compiling external sources...
 	@$(MKDIR) $(BUILD_DIR) 
-
