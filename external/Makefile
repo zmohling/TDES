@@ -7,7 +7,7 @@ MKDIR=mkdir -p
 ROOT_DIR= ..
 TEST_DIR=$(ROOT_DIR)/tests
 LIB_DIR=$(ROOT_DIR)/lib
-BUILD_DIR=$(ROOT_DIR)/build
+BUILD_DIR=build
 
 # Google Test and Google Mock
 GTEST_DIR=googletest
@@ -45,22 +45,22 @@ all: $(GTEST_LIBS) #$(TESTS)
 $(BUILD_DIR)/gtest-all.o: $(GTEST_SRCS_) | $(BUILD_DIR)
 	@$(ECHO) Compiling $(*F)
 	@$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) -I$(GMOCK_DIR) $(CXXFLAGS) \
-            -c $(GTEST_DIR)/src/gtest-all.cc -o $(BUILD_DIR)/$@
+            -c $(GTEST_DIR)/src/gtest-all.cc -o $@
 
 $(BUILD_DIR)/gtest_main.o: $(GTEST_SRCS_) | $(BUILD_DIR)
 	@$(ECHO) Compiling $(*F)
 	@$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) -I$(GMOCK_DIR) $(CXXFLAGS) \
-            -c $(GTEST_DIR)/src/gtest_main.cc -o $(BUILD_DIR)/$@
+            -c $(GTEST_DIR)/src/gtest_main.cc -o $@
 
 $(BUILD_DIR)/gmock-all.o: $(GMOCK_SRCS_) | $(BUILD_DIR)
 	@$(ECHO) Compiling $(*F)
 	@$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) -I$(GMOCK_DIR) $(CXXFLAGS) \
-            -c $(GMOCK_DIR)/src/gmock-all.cc -o $(BUILD_DIR)/$@
+            -c $(GMOCK_DIR)/src/gmock-all.cc -o $@
 
 $(BUILD_DIR)/gmock_main.o: $(GMOCK_SRCS_) | $(BUILD_DIR)
 	@$(ECHO) Compiling $(*F)
 	@$(CXX) $(CPPFLAGS) -I$(GTEST_DIR) -I$(GMOCK_DIR) $(CXXFLAGS) \
-            -c $(GMOCK_DIR)/src/gmock_main.cc -o $(BUILD_DIR)/$@
+            -c $(GMOCK_DIR)/src/gmock_main.cc -o $@
 
 $(LIB_DIR)/libgtest.a: $(BUILD_DIR)/gtest-all.o | $(LIB_DIR)
 	@$(AR) -r $@ $^ &> /dev/null
@@ -74,11 +74,10 @@ $(LIB_DIR)/libgmock.a: $(BUILD_DIR)/gmock-all.o | $(LIB_DIR)
 $(LIB_DIR)/libgmock_main.a: $(BUILD_DIR)/gmock_main.o | $(LIB_DIR)
 	@$(AR) -r $@ $^ &> /dev/null
 
-# Directory creation
+# Directory generation
 $(LIB_DIR):
 	@$(ECHO) Creating external libraries... 
 	@$(MKDIR) $(LIB_DIR) 
-
 $(BUILD_DIR):
 	@$(ECHO) Compiling external sources...
 	@$(MKDIR) $(BUILD_DIR) 

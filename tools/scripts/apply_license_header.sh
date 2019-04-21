@@ -1,10 +1,11 @@
 #!/bin/bash
 
-ROOT_DIR=`cd ../ && pwd`
-YEAR=`date +%Y`
-LICENSE_HEAD=`sed "s/<year>/$YEAR/g" $ROOT_DIR/data/LICENSE_HEAD`
+apply () {
+    ROOT_DIR=$(cd ../../ && pwd)
+    YEAR=`date +%Y`
+    LICENSE_HEAD=`sed "s/<year>/$YEAR/g" $ROOT_DIR/data/LICENSE_HEAD`
 
-for file in $ROOT_DIR/src/*; do
+    file=$1
     [ -e "$file" ] || continue
 
     FILE_CONTENTS=`cat $file`
@@ -12,4 +13,9 @@ for file in $ROOT_DIR/src/*; do
         echo -e "$LICENSE_HEAD\n" | cat - $file > temp && mv temp $file
         printf "Applied header to $file\n"
     fi
-done
+}
+
+ROOT_DIR=$(cd ../../ && pwd)
+
+export -f apply
+find $ROOT_DIR/src/ -regex ".+\.\(c\|cc\|cpp\|h\|hpp\)$" -exec bash -c 'apply "$0"' {} \;
