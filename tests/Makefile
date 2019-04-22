@@ -7,7 +7,7 @@ MKDIR=mkdir -p
 CD=cd
 
 # Binary name
-BIN=../test
+BIN=tests
 
 # Directories 
 ROOT_DIR=..
