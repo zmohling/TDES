@@ -3,6 +3,7 @@ TDES
 build/
 lib/
 data/temp
+tests/tests
 
 # Debuggin
 valgrind*

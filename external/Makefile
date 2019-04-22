@@ -31,16 +31,13 @@ GMOCK_HEADERS = $(GMOCK_DIR)/include/gmock/*.h \
 GTEST_SRCS_ = $(GTEST_DIR)/src/*.cc $(GTEST_DIR)/src/*.h $(GTEST_HEADERS)
 GMOCK_SRCS_ = $(GMOCK_DIR)/src/*.cc $(GMOCK_HEADERS)
 
-# Tests
-#TESTS=$(shell find $(TEST_DIR) -name '*.cc')
-
 # Flags passed to the preprocessor
 CPPFLAGS=-isystem $(GTEST_DIR)/include -isystem $(GMOCK_DIR)/include
 
 DEBUG_FLAGS=-Wall -Wextra -ggdb3 -fstack-protector-all
 CXXFLAGS=$(CPPFLAGS) $(DEBUG_FLAGS) -std=c++11
 
-all: $(GTEST_LIBS) #$(TESTS)
+all: $(GTEST_LIBS)
 
 $(BUILD_DIR)/gtest-all.o: $(GTEST_SRCS_) | $(BUILD_DIR)
 	@$(ECHO) Compiling $(*F)
