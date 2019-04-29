@@ -1,11 +1,11 @@
-#ifndef DES_H_
-#define DES_H_
+#ifndef CIPHER_H_
+#define CIPHER_H_
 
 #include <stdint.h>
 
-class DES {
+class Cipher {
  public:
-  DES();
+  Cipher();
 
   void encrypt(void *out, const void *in, const void *key);
 
@@ -27,4 +27,10 @@ class DES {
   void substitute(const uint8_t *in_block, uint8_t *out_block);
 };
 
-#endif  // DES_H_
+void split(const uint8_t in_bytes, const uint8_t out_bytes, const uint8_t *in_block,
+        uint8_t *left_block, uint8_t *right_block);
+
+void combine(const uint8_t in_bytes, const uint8_t out_bytes, const uint8_t *left_block,
+        const uint8_t *right_block, uint8_t *out_block);
+
+#endif  // CIPHER_H_
