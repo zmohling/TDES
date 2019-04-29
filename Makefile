@@ -54,7 +54,7 @@ TESTS=$(wildcard $(BUILD_DIR)/*_tests.o)
 MAINS=$(BUILD_DIR)/main.o
 DEP=$(OBJ:%.o=%.d)
 
-all: extern $(BIN) test
+all: extern $(BIN)
 
 $(BIN): $(OBJ)
 	@$(ECHO) Linking compiled files... 
