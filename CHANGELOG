@@ -1,4 +1,6 @@
 CHANGELOG (GIT LOG)
+2019-04-21: Removed excess comments
+2019-04-21: Tidying up
 2019-04-21: Makefiles to accommodate Google Test & Mock
 2019-04-20: Licensing
 2019-04-20: Added external libraries
