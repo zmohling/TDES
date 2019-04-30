@@ -7,9 +7,9 @@ class Cipher {
  public:
   Cipher();
 
-  void encrypt(void *out, const void *in, const void *key);
+  void encrypt(uint8_t *out, const uint8_t *in, const uint8_t *sub_keys[]);
 
-  void decrypt(void *out, const void *in, const void *key);
+  void decrypt(uint8_t *out, const uint8_t *in, const uint8_t *sub_keys[]);
 
  private:
   void permute(const uint8_t in_bytes, const uint8_t out_bytes,
@@ -19,7 +19,7 @@ class Cipher {
   void mixer(uint8_t *left_block, uint8_t *right_block,
              const uint8_t *round_key);
 
-  void swapper(uint8_t *left_block, uint8_t *right_block);
+  void swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block);
 
   void feistel_function(const uint8_t *in_block, const uint8_t *round_key,
                         uint8_t *out_block);
@@ -27,10 +27,11 @@ class Cipher {
   void substitute(const uint8_t *in_block, uint8_t *out_block);
 };
 
-void split(const uint8_t in_bytes, const uint8_t out_bytes, const uint8_t *in_block,
-        uint8_t *left_block, uint8_t *right_block);
+void split(const uint8_t in_bytes, const uint8_t out_bytes,
+           const uint8_t *in_block, uint8_t *left_block, uint8_t *right_block);
 
-void combine(const uint8_t in_bytes, const uint8_t out_bytes, const uint8_t *left_block,
-        const uint8_t *right_block, uint8_t *out_block);
+void combine(const uint8_t in_bytes, const uint8_t out_bytes,
+             const uint8_t *left_block, const uint8_t *right_block,
+             uint8_t *out_block);
 
 #endif  // CIPHER_H_
