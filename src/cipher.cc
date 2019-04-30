@@ -1,9 +1,16 @@
 #include "cipher.h"
 
+#include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <bitset>
+#include <iostream>
 #include <vector>
+
+/* Prototypes */
+static void bytes_to_bitset(const uint8_t *bytes, std::bitset<48> *b);
 
 /* Permuted Choice 1 - Key Schedule */
 const uint8_t PC1[] = {57, 49, 41, 33, 25, 17, 9,  1,  58, 50, 42, 34, 26, 18,
@@ -94,11 +101,17 @@ const uint8_t S8[] = {13, 2,  8, 4,  6,  15, 11, 1,  10, 9, 3, 14, 5,
                       2,  0,  6, 10, 13, 15, 3,  5,  8,  2, 1, 14, 7,
                       4,  10, 8, 13, 15, 12, 9,  0,  3,  5, 6, 11};
 
-Cipher::Cipher() {}
+Cipher::Cipher() {
+  uint8_t block[6] = {128, 1, 255, 1, 255, 1};
+  // uint8_t block[6] = {154, 22, 234, 1, 59, 32};
+
+  substitute(block, NULL);
+}
 
 void Cipher::encrypt(uint8_t *out, const uint8_t *in,
                      const uint8_t *sub_keys[]) {
-  uint8_t *plain_block = (uint8_t *)in, *left_block, *right_block;
+  uint8_t *plain_block = (uint8_t *)in, left_block[4], right_block[4], T1[4],
+          T2[8];
 
   permute(8, 8, in, plain_block, IP);
 
@@ -106,16 +119,18 @@ void Cipher::encrypt(uint8_t *out, const uint8_t *in,
 
   int round;
   for (round = 0; round < 16; round++) {
-    mixer(left_block, right_block, sub_keys[round]);
+    feistel_function(right_block, sub_keys[round], T1);
+
+    exclusive_or(4, left_block, T1, left_block);
 
     if (round != 15) {
       swapper(4, left_block, right_block);
     }
   }
 
-  combine(4, 8, left_block, right_block, plain_block);
+  combine(4, 8, left_block, right_block, T2);
 
-  permute(8, 8, plain_block, out, FP);
+  permute(8, 8, T2, out, FP);
 }
 
 void Cipher::decrypt(uint8_t *out, const uint8_t *in,
@@ -141,9 +156,6 @@ void Cipher::permute(const uint8_t in_bytes, const uint8_t out_bytes,
   }
 }
 
-void Cipher::mixer(uint8_t *left_block, uint8_t *right_block,
-                   const uint8_t *round_key) {}
-
 void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
   uint8_t *temp = left_block;
 
@@ -152,9 +164,32 @@ void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
 }
 
 void Cipher::feistel_function(const uint8_t *in_block, const uint8_t *round_key,
-                              uint8_t *out_block) {}
+                              uint8_t *out_block) {
+  uint8_t T1[6], T2[6], T3[6], T4[4];
 
-void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {}
+  permute(4, 6, in_block, T1, E);  // expansion
+
+  exclusive_or(6, T2, round_key, T3);
+
+  substitute(T3, T4);
+
+  permute(4, 4, T4, out_block, P);
+}
+
+void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {
+  const uint8_t *substitution_boxes[] = {S1, S2, S3, S4, S5, S6, S7, S8};
+
+  std::bitset<48> bits;
+  bytes_to_bitset(in_block, &bits);
+
+  int i, bit = 47;
+  for (i = 0; i < 8; i++, bit -= 6) {
+    int row = (bits[bit] * 2) + (bits[bit - 5] * 1);
+    int column = (bits[bit - 1] * 8) + (bits[bit - 2] * 4) +
+                 (bits[bit - 3] * 2) + (bits[bit - 4] * 2);
+    out_block[i] = (substitution_boxes[i][(row * column) + column]);
+  }
+}
 
 void split(const uint8_t in_bytes, const uint8_t out_bytes,
            const uint8_t *in_block, uint8_t *left_block, uint8_t *right_block) {
@@ -191,11 +226,32 @@ void combine(const uint8_t in_bytes, const uint8_t out_bytes,
   }
 }
 
-static unsigned create_mask(unsigned start_bit, unsigned end_bit) {
+void exclusive_or(const uint8_t bytes, const uint8_t *first_block,
+                  const uint8_t *second_block, uint8_t *out_block) {
+  uint8_t byte;
+  for (byte = 0; byte < bytes; byte++) {
+    out_block[byte] = first_block[byte] ^ second_block[byte];
+  }
+}
+
+static uint64_t create_mask(unsigned start_bit, unsigned end_bit) {
   unsigned i, bit_mask = 0;
   for (i = start_bit; i <= end_bit; i++) {
     bit_mask |= 1 << i;
   }
 
   return bit_mask;
+}
+
+static void bytes_to_bitset(const uint8_t *bytes, std::bitset<48> *b) {
+  for (int i = 0; i < 6; ++i) {
+    uint8_t cur = bytes[5 - i];
+    int offset = i * CHAR_BIT;
+
+    for (int bit = 0; bit < CHAR_BIT; ++bit) {
+      (*b)[offset] = cur & 1;
+      ++offset;
+      cur >>= 1;
+    }
+  }
 }
