@@ -1,4 +1,11 @@
 CHANGELOG (GIT LOG)
+2019-05-01: Cipher issues
+2019-05-01: Bitwise operations failed. Bitset
+2019-04-30: Added Feistal function, substitution
+2019-04-30: Fixed permutation error
+2019-04-29: Update Makefile
+2019-04-29: Added cipher class
+2019-04-29: a
 2019-04-21: Removed excess comments
 2019-04-21: Tidying up
 2019-04-21: Makefiles to accommodate Google Test & Mock
