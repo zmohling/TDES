@@ -67,10 +67,17 @@ static void encryption_test() {
 
   uint8_t sub_keys[16][6];
   k.generate(key, sub_keys);
-  c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
 
+  bitset<64> original_bits;
+  bytes_to_bitset64((const uint8_t *)plaintext, &original_bits);
+  cout << "Original : " << original_bits.to_string() << endl;
+
+  //-----------encryption-------------------
+  c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
   bitset<64> encrypted_bits;
   bytes_to_bitset64(ciphertext, &encrypted_bits);
+
+  cout << "Encrypted: " << encrypted_bits.to_string() << endl;
 
   if (encrypted_bits.to_string().compare(encrypted_val) != 0) {
       string error = "Encryption error: " + encrypted_bits.to_string() + " should be " +
@@ -78,6 +85,15 @@ static void encryption_test() {
       cout << error << endl;
       throw error;
   }
+
+  //------------decryption--------------
+
+  c.decrypt(ciphertext, (const uint8_t *)ciphertext, sub_keys);
+  bitset<64> decrypted_bits;
+  bytes_to_bitset64(ciphertext, &decrypted_bits);
+
+  cout << "Decrypted: " << decrypted_bits.to_string() << endl;
+
 
   int i;
   for (i = 0; i < 16; i++) {

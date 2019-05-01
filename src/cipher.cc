@@ -116,7 +116,29 @@ void Cipher::encrypt(uint8_t *out, const uint8_t *in,
 }
 
 void Cipher::decrypt(uint8_t *out, const uint8_t *in,
-                     const uint8_t sub_keys[16][6]) {}
+                     const uint8_t sub_keys[16][6]) {
+  uint8_t T[8], left_block[4], right_block[4], T1[4], T3[8];
+
+  permute(8, 8, in, T, IP);
+
+  split(8, 4, T, left_block, right_block);
+
+  int round;
+  for (round = 15; round >= 0; round--) {
+
+    feistel_function(right_block, sub_keys[round], T1);
+
+    exclusive_or(4, left_block, T1, left_block);
+
+    if (round != 0) {
+      swapper(4, left_block, right_block);
+    }
+  }
+
+  combine(4, 8, left_block, right_block, T3);
+
+  permute(8, 8, T3, out, FP);
+}
 
 void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
     int i;
