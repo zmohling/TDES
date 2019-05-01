@@ -7,7 +7,7 @@ MKDIR=mkdir -p
 CD=cd
 
 # Binary name
-BIN=TDES
+BIN=tdes
 
 # Directories 
 ROOT_DIR=.
@@ -59,7 +59,7 @@ $(BUILD_DIR)/%.o: $(SUB_DIRS)%.cc | $(BUILD_DIR)
 .PHONY: clean lint uninstall
 clean:
 	@$(ECHO) Removing all generated files and executables...
-	@$(RM) $(BUILD_DIR) $(BIN) core vgcore.* valgrind*
+	@$(RM) $(BUILD_DIR) $(BIN) *.txt core vgcore.* valgrind*
 
 deep_clean:
 	@$(ECHO) Removing all generated files and executables...

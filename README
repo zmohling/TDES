@@ -1,0 +1,9 @@
+Disclaimer: This implementation truncates the trailing block of 64 bits. Do not use this software on sensitive data.
+
+An implementation of the DES (Data Encryption Standard) specification. This cryptography method is out-dated, and has been replaced with the Triple Data Encryption Standard, or TDES. Full TDES implementation is the goal of this project.
+
+Usage: tdes [-enc|-dec] <source> <dest>
+
+After building with GNU make, run the executable with the stated arguments. The key is built in and is only customizable by altering the source code. 
+
+Recommended: Use the tdes tool to encrypt the provided text file located at data/bee_movie_script. Again, use the tool to decrypt the destination file to demonstrate the encryption -> decryption life-cycle.
