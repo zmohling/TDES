@@ -1,9 +1,14 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <algorithm>
 #include <string.h>
 #include <bitset>
 #include <iostream>
+#include <fstream>
+#include <vector>
 
 #include "cipher.h"
 #include "key_generator.h"
@@ -58,7 +63,6 @@ static void bytes_to_bitset64(const uint8_t *bytes, std::bitset<64> *b) {
 
 static void encryption_test() {
   Cipher c;
-
   KeyGenerator k;
 
   const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
@@ -88,9 +92,10 @@ static void encryption_test() {
 
   //------------decryption--------------
 
-  c.decrypt(ciphertext, (const uint8_t *)ciphertext, sub_keys);
+  uint8_t plain[8];
+  c.decrypt(plain, (const uint8_t *)ciphertext, sub_keys);
   bitset<64> decrypted_bits;
-  bytes_to_bitset64(ciphertext, &decrypted_bits);
+  bytes_to_bitset64(plain, &decrypted_bits);
 
   cout << "Decrypted: " << decrypted_bits.to_string() << endl;
 
@@ -110,8 +115,116 @@ static void encryption_test() {
   }
 }
 
-int main() {
-  encryption_test();
+char* getCmdOption(char ** begin, char ** end, const std::string & option) {
+    char ** itr = std::find(begin, end, option);
+    if (itr != end && ++itr != end) {
+        return *itr;
+    }
+    return 0;
+}
+
+bool cmdOptionExists(char** begin, char** end, const std::string& option) {
+    return std::find(begin, end, option) != end;
+}
+
+int main(int argc, char *argv[]) {
+
+  if (argc < 4) {
+    // print usage
+  }
+
+  int mode = 0; // 0 for encrypt, 1 for decrypt
+  std::string in_file_name(argv[3]), out_file_name(argv[4]);
+
+  if (cmdOptionExists(argv, argv+argc, "-enc")) {
+      mode = 0;
+  }
+
+  if (cmdOptionExists(argv, argv+argc, "-dec")) {
+      mode = 1;
+  }
+
+  Cipher c;
+  KeyGenerator k;
+
+  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  uint8_t sub_keys[16][6];
+  k.generate(key, sub_keys);
+
+  uint8_t ciphertext[8];
+  char *buffer;
+  long filelen;
+
+  FILE *in_file_ptr;
+  in_file_ptr = fopen(in_file_name.c_str(), "rb");
+  fseek(in_file_ptr, 0, SEEK_END);
+  filelen = ftell(in_file_ptr);
+  rewind(in_file_ptr);
+  buffer = (char *)malloc((filelen+1)*sizeof(char));
+  fread(buffer, filelen, 1, in_file_ptr);
+  fclose(in_file_ptr);
+
+  FILE *out_file_ptr;
+  out_file_ptr = fopen(out_file_name.c_str(), "wb");
+
+  long cur_len = 0;
+  while ((cur_len + 8) <= filelen) {
+    c.decrypt(ciphertext, (const uint8_t *)buffer, sub_keys);
+
+    fwrite(ciphertext, 8, 1, out_file_ptr);
+
+    buffer+=8; cur_len+=8;
+  }
+
+  fclose(out_file_ptr);
+/*
+  Cipher c;
+  KeyGenerator k;
+
+  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  uint8_t ciphertext[8];
+
+  uint8_t sub_keys[16][6];
+  k.generate(key, sub_keys);
+
+
+  ifstream in_file;
+  ofstream out_file;
+
+  string in_path("out_test.txt");
+  in_file.open(in_path, ios::in);
+
+  if (!in_file) {
+    cerr << "Can't open input file " << in_path << endl;
+    exit(1);
+  }
+
+  string out_path("out_test2.txt");
+  out_file.open(out_path, ios::out);
+
+  if (!out_file) {
+    cerr << "Can't open output file " << out_path << endl;
+    exit(1);
+  }
+
+  char buffer[8];
+  memset(buffer, 0, 8);
+
+  if (in_file.is_open()) {
+    while (in_file.read(buffer, 8)) {
+      //c.decrypt(ciphertext, (const uint8_t *)ciphertext, sub_keys);
+      //c.encrypt(ciphertext, (const uint8_t *)buffer, sub_keys);
+
+      int i;
+      for (i = 0; i < 8; i++)
+        out_file << ciphertext[i];
+    }
+
+    in_file.close();
+    out_file.close();
+  }
+
 
   return 0;
+  */
 }
