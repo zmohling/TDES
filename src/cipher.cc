@@ -87,59 +87,19 @@ const uint8_t S8[] = {13, 2,  8, 4,  6,  15, 11, 1,  10, 9, 3, 14, 5,
                       6,  11, 0, 14, 9,  2,  7,  11, 4,  1, 9, 12, 14,
                       2,  0,  6, 10, 13, 15, 3,  5,  8,  2, 1, 14, 7,
                       4,  10, 8, 13, 15, 12, 9,  0,  3,  5, 6, 11};
-//----temp-----
-static void bytes_to_bitset64(const uint8_t *bytes, std::bitset<64> *b) {
-  for (int i = 0; i < 8; ++i) {
-    uint8_t cur = bytes[7 - i];
-    int offset = i * CHAR_BIT;
 
-    for (int bit = 0; bit < CHAR_BIT; ++bit) {
-      (*b)[offset] = cur & 1;
-      ++offset;
-      cur >>= 1;
-    }
-  }
-}
-
-static void bytes_to_bitset32(const uint8_t *bytes, std::bitset<32> *b) {
-  for (int i = 0; i < 4; ++i) {
-    uint8_t cur = bytes[3 - i];
-    int offset = i * CHAR_BIT;
-
-    for (int bit = 0; bit < CHAR_BIT; ++bit) {
-      (*b)[offset] = cur & 1;
-      ++offset;
-      cur >>= 1;
-    }
-  }
-}
-
-//--------------------
 Cipher::Cipher() {}
 
 void Cipher::encrypt(uint8_t *out, const uint8_t *in,
                      const uint8_t sub_keys[16][6]) {
-  uint8_t T[8], left_block[4], right_block[4], T1[4], T2[8];
+  uint8_t T[8], left_block[4], right_block[4], T1[4], T3[8];
 
   permute(8, 8, in, T, IP);
 
-  bitset<64> encrypted_bits;
-  bytes_to_bitset64(T, &encrypted_bits);
-  cout << "Permutated: " << encrypted_bits.to_string() << endl;
-
   split(8, 4, T, left_block, right_block);
-
-  bitset<32> left_bits;
-  bytes_to_bitset32(left_block, &left_bits);
-  cout << "Left: " << left_bits.to_string() << endl;
-
-  bitset<32> right_bits;
-  bytes_to_bitset32(right_block, &right_bits);
-  cout << "Right: " << right_bits.to_string() << endl;
 
   int round;
   for (round = 0; round < 16; round++) {
-    cout << round + 1 << endl;
 
     feistel_function(right_block, sub_keys[round], T1);
 
@@ -150,19 +110,21 @@ void Cipher::encrypt(uint8_t *out, const uint8_t *in,
     }
   }
 
-  combine(4, 8, left_block, right_block, T2);
+  combine(4, 8, left_block, right_block, T3);
 
-  permute(8, 8, T2, out, FP);
+  permute(8, 8, T3, out, FP);
 }
 
 void Cipher::decrypt(uint8_t *out, const uint8_t *in,
                      const uint8_t sub_keys[16][6]) {}
 
 void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
-  uint8_t *temp = left_block;
-
-  left_block = right_block;
-  right_block = temp;
+    int i;
+    for (i = 0; i < bytes; i++) {
+        uint8_t temp = left_block[i];
+        left_block[i] = right_block[i];
+        right_block[i] = temp;
+    }
 }
 
 void Cipher::feistel_function(const uint8_t *in_block, const uint8_t *round_key,
@@ -171,27 +133,11 @@ void Cipher::feistel_function(const uint8_t *in_block, const uint8_t *round_key,
 
   permute(4, 6, in_block, T1, E);  // expansion
 
-  bitset<48> expansion_bits;
-  bytes_to_bitset48(T1, &expansion_bits);
-  cout << "EXP: " << expansion_bits.to_string() << endl;
-
   exclusive_or(6, T1, round_key, T2);
-
-  bitset<48> xor_bits;
-  bytes_to_bitset48(T2, &xor_bits);
-  cout << "XOR: " << xor_bits.to_string() << endl;
 
   substitute(T2, T3);
 
-  bitset<32> sub_bits;
-  bytes_to_bitset32(T3, &sub_bits);
-  cout << "SUB: " << sub_bits.to_string() << endl;
-
   permute(4, 4, T3, out_block, P);
-
-  bitset<32> perm_bits;
-  bytes_to_bitset32(out_block, &perm_bits);
-  cout << "PER: " << perm_bits.to_string() << endl << endl;
 }
 
 void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {
@@ -214,8 +160,6 @@ void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {
       j++;
     }
   }
-
-  // cout << "[" << row << "][" << column << "] = " << (int)index << endl;
 }
 
 void permute(const uint8_t in_bytes, const uint8_t out_bytes,

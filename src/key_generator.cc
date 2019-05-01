@@ -65,6 +65,7 @@ void KeyGenerator::shift_left(uint64_t *key, const uint8_t num_shifts) {
 void KeyGenerator::split_keys(const uint8_t *key, uint64_t *left_key,
                               uint64_t *right_key) {
   bitset<56> parity_dropped_key;
+
   bytes_to_bitset56((const uint8_t *)key, &parity_dropped_key);
 
   *left_key = (parity_dropped_key.to_ullong() >> 28) & 0xFFFFFFF;

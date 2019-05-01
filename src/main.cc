@@ -28,6 +28,8 @@ std::string sub_keys_str[16] = {
     "111100001011111000100110101000010000001000110101",
     "111100001011111000100110101000110100001010000000"};
 
+std::string encrypted_val = "0010101010001101011010011101111010011101010111111101111111111001";
+
 static void bytes_to_bitset48(const uint8_t *bytes, std::bitset<48> *b) {
   for (int i = 0; i < 6; ++i) {
     uint8_t cur = bytes[5 - i];
@@ -54,7 +56,29 @@ static void bytes_to_bitset64(const uint8_t *bytes, std::bitset<64> *b) {
   }
 }
 
-static void test_keys(uint8_t sub_keys[16][6]) {
+static void encryption_test() {
+  Cipher c;
+
+  KeyGenerator k;
+
+  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  const char plaintext[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  uint8_t ciphertext[8];
+
+  uint8_t sub_keys[16][6];
+  k.generate(key, sub_keys);
+  c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
+
+  bitset<64> encrypted_bits;
+  bytes_to_bitset64(ciphertext, &encrypted_bits);
+
+  if (encrypted_bits.to_string().compare(encrypted_val) != 0) {
+      string error = "Encryption error: " + encrypted_bits.to_string() + " should be " +
+                     encrypted_val + ".";
+      cout << error << endl;
+      throw error;
+  }
+
   int i;
   for (i = 0; i < 16; i++) {
     bitset<48> sub_key_bits;
@@ -69,27 +93,9 @@ static void test_keys(uint8_t sub_keys[16][6]) {
     }
   }
 }
+
 int main() {
-  Cipher c;
-
-  KeyGenerator k;
-
-  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-  const char plaintext[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-  uint8_t ciphertext[8];
-
-  bitset<64> original_bits;
-  bytes_to_bitset64((const uint8_t *)plaintext, &original_bits);
-  cout << "Original: " << original_bits.to_string() << endl;
-
-  uint8_t sub_keys[16][6];
-  k.generate(key, sub_keys);
-
-  c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
-
-  bitset<64> encrypted_bits;
-  bytes_to_bitset64(ciphertext, &encrypted_bits);
-  cout << "Encrypted: " << encrypted_bits.to_string() << endl;
+  encryption_test();
 
   return 0;
 }
