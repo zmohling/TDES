@@ -40,7 +40,7 @@ INC_DIRS=$(SRC_DIR)
 INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 
 # Compilation and linking flags
-DEBUG_FLAGS=-Wall -ggdb3 -fstack-protector-all
+DEBUG_FLAGS=-Wall -ggdb3
 C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
 CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11
 LD_FLAGS=-lm

@@ -12,10 +12,6 @@ class Cipher {
   void decrypt(uint8_t *out, const uint8_t *in, const uint8_t *sub_keys[]);
 
  private:
-  void permute(const uint8_t in_bytes, const uint8_t out_bytes,
-               const uint8_t *in_block, uint8_t *out_block,
-               const uint8_t *permute_table);
-
   void swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block);
 
   void feistel_function(const uint8_t *in_block, const uint8_t *round_key,
@@ -23,6 +19,10 @@ class Cipher {
 
   void substitute(const uint8_t *in_block, uint8_t *out_block);
 };
+
+void permute(const uint8_t in_bytes, const uint8_t out_bytes,
+             const uint8_t *in_block, uint8_t *out_block,
+             const uint8_t *permute_table);
 
 void split(const uint8_t in_bytes, const uint8_t out_bytes,
            const uint8_t *in_block, uint8_t *left_block, uint8_t *right_block);

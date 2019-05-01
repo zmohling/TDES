@@ -12,21 +12,6 @@
 /* Prototypes */
 static void bytes_to_bitset(const uint8_t *bytes, std::bitset<48> *b);
 
-/* Permuted Choice 1 - Key Schedule */
-const uint8_t PC1[] = {57, 49, 41, 33, 25, 17, 9,  1,  58, 50, 42, 34, 26, 18,
-                       10, 2,  59, 51, 43, 35, 27, 19, 11, 3,  60, 52, 44, 36,
-                       63, 55, 47, 39, 31, 23, 15, 7,  62, 54, 46, 38, 30, 22,
-                       14, 6,  61, 53, 45, 37, 29, 21, 13, 5,  28, 20, 12, 4};
-
-/* Permuted Choice 2 - Key Schedule */
-const uint8_t PC2[] = {14, 17, 11, 24, 1,  5,  3,  28, 15, 6,  21, 10,
-                       23, 19, 12, 4,  26, 8,  16, 7,  27, 20, 13, 2,
-                       41, 52, 31, 37, 47, 55, 30, 40, 51, 45, 33, 48,
-                       44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32};
-
-/* Bit rotation - Key */
-const uint8_t bit_rotation[] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
-
 /* Initial purmutation */
 const uint8_t IP[] = {58, 50, 42, 34, 26, 18, 10, 2,  60, 52, 44, 36, 28,
                       20, 12, 4,  62, 54, 46, 38, 30, 22, 14, 6,  64, 56,
@@ -101,12 +86,7 @@ const uint8_t S8[] = {13, 2,  8, 4,  6,  15, 11, 1,  10, 9, 3, 14, 5,
                       2,  0,  6, 10, 13, 15, 3,  5,  8,  2, 1, 14, 7,
                       4,  10, 8, 13, 15, 12, 9,  0,  3,  5, 6, 11};
 
-Cipher::Cipher() {
-  uint8_t block[6] = {128, 1, 255, 1, 255, 1};
-  // uint8_t block[6] = {154, 22, 234, 1, 59, 32};
-
-  substitute(block, NULL);
-}
+Cipher::Cipher() {}
 
 void Cipher::encrypt(uint8_t *out, const uint8_t *in,
                      const uint8_t *sub_keys[]) {
@@ -135,26 +115,6 @@ void Cipher::encrypt(uint8_t *out, const uint8_t *in,
 
 void Cipher::decrypt(uint8_t *out, const uint8_t *in,
                      const uint8_t *sub_keys[]) {}
-
-void Cipher::permute(const uint8_t in_bytes, const uint8_t out_bytes,
-                     const uint8_t *in_block, uint8_t *out_block,
-                     const uint8_t *permute_table) {
-  int byte, bit;
-  for (byte = 0; byte < out_bytes; byte++) {
-    uint8_t permute_val, t = 0;
-    for (bit = 0; bit < 8; bit++) {
-      permute_val = *(permute_table++) - 1;
-
-      t <<= 1;
-
-      if ((in_block[permute_val / 8]) & (0x80 >> (permute_val % 8))) {
-        t |= 0x01;
-      }
-    }
-
-    out_block[byte] = t;
-  }
-}
 
 void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
   uint8_t *temp = left_block;
@@ -188,6 +148,24 @@ void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {
     int column = (bits[bit - 1] * 8) + (bits[bit - 2] * 4) +
                  (bits[bit - 3] * 2) + (bits[bit - 4] * 2);
     out_block[i] = (substitution_boxes[i][(row * column) + column]);
+  }
+}
+
+void permute(const uint8_t in_bytes, const uint8_t out_bytes,
+             const uint8_t *in_block, uint8_t *out_block,
+             const uint8_t *permute_table) {
+  uint8_t byte, bit;
+  for (byte = 0; byte < out_bytes; ++byte) {
+    uint8_t x, t = 0;
+    for (bit = 0; bit < 8; ++bit) {
+      x = *permute_table - 1;
+      permute_table++;
+      t <<= 1;
+      if ((in_block[x / 8]) & (0x80 >> (x % 8))) {
+        t |= 0x01;
+      }
+    }
+    out_block[byte] = t;
   }
 }
 
@@ -232,15 +210,6 @@ void exclusive_or(const uint8_t bytes, const uint8_t *first_block,
   for (byte = 0; byte < bytes; byte++) {
     out_block[byte] = first_block[byte] ^ second_block[byte];
   }
-}
-
-static uint64_t create_mask(unsigned start_bit, unsigned end_bit) {
-  unsigned i, bit_mask = 0;
-  for (i = start_bit; i <= end_bit; i++) {
-    bit_mask |= 1 << i;
-  }
-
-  return bit_mask;
 }
 
 static void bytes_to_bitset(const uint8_t *bytes, std::bitset<48> *b) {
