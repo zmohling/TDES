@@ -6,8 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <bitset>
+#include <iostream>
 
 #include "cipher.h"
+
+using namespace std;
+
+/* Prototypes */
+static void bytes_to_bitset56(const uint8_t *bytes, std::bitset<56> *b);
 
 /* Permuted Choice 1 - Key Schedule */
 const uint8_t PC1[] = {57, 49, 41, 33, 25, 17, 9,  1,  58, 50, 42, 34, 26, 18,
@@ -29,7 +35,11 @@ KeyGenerator::KeyGenerator() {}
 void KeyGenerator::generate(const char *key_with_parities,
                             uint8_t round_keys[16][6]) {
   uint8_t T1[7], T2[7];
-  uint64_t left_key, right_key;
+  uint64_t left_key = 0, right_key = 0;
+
+  /* init */
+  memset(round_keys, 0, 16 * 6);
+  memset(T1, 0, 7);
 
   permute(8, 7, (const uint8_t *)key_with_parities, T1, PC1);
 
@@ -52,43 +62,37 @@ void KeyGenerator::shift_left(uint64_t *key, const uint8_t num_shifts) {
   *key = (*key << num_shifts) | (*key >> (-num_shifts & 27));
 }
 
-void KeyGenerator::split_keys(const uint8_t *in_block, uint64_t *left_block,
-                              uint64_t *right_block) {
-  uint8_t i, j, bit, key_size = 28, in_bytes = 7;
+void KeyGenerator::split_keys(const uint8_t *key, uint64_t *left_key,
+                              uint64_t *right_key) {
+  bitset<56> parity_dropped_key;
+  bytes_to_bitset56((const uint8_t *)key, &parity_dropped_key);
 
-  for (i = 0; i < in_bytes; i++) {
-    uint8_t cur = in_block[i];
+  *left_key = (parity_dropped_key.to_ullong() >> 28) & 0xFFFFFFF;
 
-    for (j = 0; j < CHAR_BIT; j++) {
-      bit = ((in_bytes - 1) - i) * CHAR_BIT + j;
-
-      if (bit >= key_size)
-        *left_block |= (cur & 1LL) << (bit - key_size);
-      else
-        *right_block |= (cur & 1LL) << (bit);
-
-      cur >>= 1;
-    }
-  }
+  *right_key = parity_dropped_key.to_ullong() & 0xFFFFFFF;
 }
 
-void KeyGenerator::combine_keys(const uint64_t *left_block,
-                                const uint64_t *right_block,
-                                uint8_t *out_block) {
-  int i, j;
-  uint8_t bit, key_size = 28, out_bytes = 7;
+void KeyGenerator::combine_keys(const uint64_t *left_key,
+                                const uint64_t *right_key,
+                                uint8_t *combined_key) {
+  memset(combined_key, 0, 7);
 
-  for (i = (out_bytes - 1); i >= 0; i--) {
-    uint8_t *out_byte = &out_block[i];
+  uint64_t combined_int64 = *left_key << 28 | (*right_key & 0xFFFFFFF);
 
-    for (j = 0; j < CHAR_BIT; j++) {
-      bit = ((out_bytes - 1) - i) * CHAR_BIT + j;
+  int byte;
+  for (byte = 6; byte >= 0; byte--)
+    combined_key[byte] |= combined_int64 >> ((6 - byte) * 8);
+}
 
-      if (bit < key_size) {
-        *out_byte |= ((*right_block >> bit) & 1LL) << (bit % 8);
-      } else {
-        *out_byte |= ((*left_block >> (bit - 28)) & 1LL) << (bit % 8);
-      }
+static void bytes_to_bitset56(const uint8_t *bytes, std::bitset<56> *b) {
+  for (int i = 0; i < 7; ++i) {
+    uint8_t cur = bytes[6 - i];
+    int offset = i * CHAR_BIT;
+
+    for (int bit = 0; bit < CHAR_BIT; ++bit) {
+      (*b)[offset] = cur & 1;
+      ++offset;
+      cur >>= 1;
     }
   }
 }

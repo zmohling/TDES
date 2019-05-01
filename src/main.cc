@@ -10,57 +10,27 @@
 
 using namespace std;
 
-/* Bit rotation - Key */
-const uint8_t bit_rotation[] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
+std::string sub_keys_str[16] = {
+    "111000001011111001100110000100110010101010000010",
+    "111000001011011001110110000100000010001100000111",
+    "111001001101011001110110101101100000000010000100",
+    "111001101101001101110010010000000010001111000011",
+    "101011101101001101110011001101101010000000001001",
+    "101011110101001101011011011000100001010101000010",
+    "001011110101001111011001000011001010000100101010",
+    "000111110101100111011001011001000101110001000000",
+    "000111110100100111011001010010101001100001000000",
+    "000111110110100110011101110000001100010100111000",
+    "000111110010110110001101000010010001111000001000",
+    "010110110010110010101101110110000101000000110000",
+    "110110011010110010101100000000010100101000101100",
+    "110100001010111010101110100100000011100010010000",
+    "111100001011111000100110101000010000001000110101",
+    "111100001011111000100110101000110100001010000000"};
 
-static void shift_left(uint64_t *key, const uint8_t num_shifts) {
-  assert(num_shifts < 28);
-  *key = (*key << num_shifts) | (*key >> (-num_shifts & 27));
-}
-
-static void split_keys(const uint8_t *in_block, uint64_t *left_block,
-                       uint64_t *right_block) {
-  uint8_t i, j, bit, key_size = 28, in_bytes = 7;
-
-  for (i = 0; i < in_bytes; i++) {
-    uint8_t cur = in_block[i];
-
-    for (j = 0; j < CHAR_BIT; j++) {
-      bit = ((in_bytes - 1) - i) * CHAR_BIT + j;
-
-      if (bit >= key_size)
-        *left_block |= (cur & 1LL) << (bit - key_size);
-      else
-        *right_block |= (cur & 1LL) << (bit);
-
-      cur >>= 1;
-    }
-  }
-}
-
-static void combine_keys(const uint64_t *left_block,
-                         const uint64_t *right_block, uint8_t *out_block) {
-  int i, j;
-  uint8_t bit, key_size = 28, out_bytes = 7;
-
-  for (i = (out_bytes - 1); i >= 0; i--) {
-    uint8_t *out_byte = &out_block[i];
-
-    for (j = 0; j < CHAR_BIT; j++) {
-      bit = ((out_bytes - 1) - i) * CHAR_BIT + j;
-
-      if (bit < key_size) {
-        *out_byte |= ((*right_block >> bit) & 1LL) << (bit % 8);
-      } else {
-        *out_byte |= ((*left_block >> (bit - 28)) & 1LL) << (bit % 8);
-      }
-    }
-  }
-}
-
-static void bytes_to_bitset(const uint8_t *bytes, std::bitset<56> *b) {
-  for (int i = 0; i < 7; ++i) {
-    uint8_t cur = bytes[6 - i];
+static void bytes_to_bitset48(const uint8_t *bytes, std::bitset<48> *b) {
+  for (int i = 0; i < 6; ++i) {
+    uint8_t cur = bytes[5 - i];
     int offset = i * CHAR_BIT;
 
     for (int bit = 0; bit < CHAR_BIT; ++bit) {
@@ -71,59 +41,55 @@ static void bytes_to_bitset(const uint8_t *bytes, std::bitset<56> *b) {
   }
 }
 
-int main() {
-  KeyGenerator k;
+static void bytes_to_bitset64(const uint8_t *bytes, std::bitset<64> *b) {
+  for (int i = 0; i < 8; ++i) {
+    uint8_t cur = bytes[7 - i];
+    int offset = i * CHAR_BIT;
 
-  const char key[7] = {'a', 'b', 'c', 'd', 'e', 'f', 'g'};
-  uint8_t sub_keys[16][6];
-  memset(sub_keys, 0, 16 * 6);
+    for (int bit = 0; bit < CHAR_BIT; ++bit) {
+      (*b)[offset] = cur & 1;
+      ++offset;
+      cur >>= 1;
+    }
+  }
+}
 
-  uint64_t left_key, right_key;
-
-  bitset<56> start_bits;
-  bytes_to_bitset((const uint8_t *)key, &start_bits);
-
-  //------------split----------------
-  left_key = start_bits.to_ullong();
-  left_key >>= 28;
-
-  right_key = start_bits.to_ullong() & 0xFFFFFFF;
-
-  //------------------------
-
+static void test_keys(uint8_t sub_keys[16][6]) {
   int i;
   for (i = 0; i < 16; i++) {
-    //-------------shift---------------
+    bitset<48> sub_key_bits;
+    bytes_to_bitset48(sub_keys[i], &sub_key_bits);
+    string sub_key = sub_key_bits.to_string();
 
-    shift_left(&left_key, bit_rotation[i]);
-    shift_left(&right_key, bit_rotation[i]);
-
-    bitset<28> left_bits(left_key);
-    bitset<28> right_bits(right_key);
-    //------------------------
-
-    //------------combine-------------------
-    uint8_t combined[7];
-    memset(combined, 0, 7);
-
-    bitset<56> combined_bits;
-
-    uint64_t comb = left_bits.to_ullong() << 28 | right_bits.to_ullong();
-
-    int x;
-    for (x = 6; x >= 0; x--) {
-      combined[x] |= comb >> ((6 - x) * 8);
+    if (sub_key.compare(sub_keys_str[i]) != 0) {
+      string error = " - Key generation error: " + sub_key + " should be " +
+                     sub_keys_str[i] + ".";
+      cout << i << error << endl;
+      throw error;
     }
-    bytes_to_bitset(combined, &combined_bits);
-    //------------------------------------
-
-    cout << combined_bits.to_string() << endl;
   }
-  /*
-  cout << start_bits.to_string() << endl;
-  cout << left_bits.to_string() << endl;
-  cout << "                            " << right_bits.to_string() << endl;
-  cout << combined_bits.to_string() << endl;
-*/
+}
+int main() {
+  Cipher c;
+
+  KeyGenerator k;
+
+  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  const char plaintext[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  uint8_t ciphertext[8];
+
+  bitset<64> original_bits;
+  bytes_to_bitset64((const uint8_t *)plaintext, &original_bits);
+  cout << "Original: " << original_bits.to_string() << endl;
+
+  uint8_t sub_keys[16][6];
+  k.generate(key, sub_keys);
+
+  c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
+
+  bitset<64> encrypted_bits;
+  bytes_to_bitset64(ciphertext, &encrypted_bits);
+  cout << "Encrypted: " << encrypted_bits.to_string() << endl;
+
   return 0;
 }

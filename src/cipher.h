@@ -7,9 +7,9 @@ class Cipher {
  public:
   Cipher();
 
-  void encrypt(uint8_t *out, const uint8_t *in, const uint8_t *sub_keys[]);
+  void encrypt(uint8_t *out, const uint8_t *in, const uint8_t sub_keys[16][6]);
 
-  void decrypt(uint8_t *out, const uint8_t *in, const uint8_t *sub_keys[]);
+  void decrypt(uint8_t *out, const uint8_t *in, const uint8_t sub_keys[16][6]);
 
  private:
   void swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block);
