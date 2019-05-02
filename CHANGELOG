@@ -1,0 +1,20 @@
+CHANGELOG (GIT LOG)
+2019-05-02: IO, input parsing, refactoring
+2019-05-01: IO implementation
+2019-05-01: IO improvements
+2019-05-01: Decryption testing
+2019-05-01: Encryption working - S BOX issue
+2019-05-01: Documentation
+2019-05-01: Cipher issues
+2019-05-01: Bitwise operations failed. Bitset
+2019-04-30: Added Feistal function, substitution
+2019-04-30: Fixed permutation error
+2019-04-29: Update Makefile
+2019-04-29: Added cipher class
+2019-04-29: a
+2019-04-21: Removed excess comments
+2019-04-21: Tidying up
+2019-04-21: Makefiles to accommodate Google Test & Mock
+2019-04-20: Licensing
+2019-04-20: Added external libraries
+2019-04-19: Initial commit

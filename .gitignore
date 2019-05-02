@@ -1,8 +1,11 @@
 # Project specific paths
-TDES
+tdes
 build/
 lib/
 data/temp
+tests/tests
+*.txt
+CPPLINT.cfg
 
 # Debuggin
 valgrind*
