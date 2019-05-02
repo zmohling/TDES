@@ -13,6 +13,3 @@ Dependency:
 
 Building:
     After building with GNU make, run the executable with the stated arguments. The encryption key is generated from the password you enter. That same password must be used to decrypt that file. 
-
-Recommend Demo for you, the TA: 
-    Use the tdes tool to encrypt the provided text file located at data/bee_movie_script. Again, use the tool to decrypt the destination file to demonstrate the encryption -> decryption life-cycle. Theoretically, it'll work on any binary, but I only verified that it works with text and .mp4 files.
