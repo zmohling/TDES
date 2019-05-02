@@ -5,11 +5,14 @@ LINT=cpplint
 RM=rm -rvf
 MKDIR=mkdir -p
 CD=cd
+INSTALL=install
 
 # Binary name
 BIN=tdes
 
 # Directories 
+DEST_DIR=/
+INSTALL_DIR=usr/local/bin
 ROOT_DIR=.
 SRC_DIR=$(ROOT_DIR)/src
 SUB_DIRS=$(sort $(dir $(wildcard $(SRC_DIR)/*/)))
@@ -56,20 +59,21 @@ $(BUILD_DIR)/%.o: $(SUB_DIRS)%.cc | $(BUILD_DIR)
 	@$(ECHO) Compiling $<
 	@$(CXX) $(CXX_FLAGS) -MMD -c $< -o $@
 
-.PHONY: clean lint uninstall
+.PHONY: clean lint install uninstall
 clean:
 	@$(ECHO) Removing all generated files and executables...
 	@$(RM) $(BUILD_DIR) $(BIN) *.txt core vgcore.* valgrind*
 
-deep_clean:
-	@$(ECHO) Removing all generated files and executables...
-	@$(RM) $(BUILD_DIR) $(BIN) core vgcore.* valgrind*
-	@$(ECHO) Removing libraries...
-	@$(RM) $(LIB_DIR)
-
 lint:
 	@$(ECHO) Linting source files per Google\'s CXX Styleguide...
 	@$(LINT) $(C_SRC) $(CXX_SRC)
+
+install:
+	@$(ECHO) "Installing to $(DEST_DIR)$(INSTALL_DIR)"
+	@$(INSTALL) $(BIN) $(DEST_DIR)$(INSTALL_DIR)
+
+uninstall:
+	@$(RM) $(DEST_DIR)$(INSTALL_DIR)/$(BIN)
 
 # Directory generation
 $(BUILD_DIR):

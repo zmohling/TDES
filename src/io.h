@@ -101,7 +101,7 @@ static void toggle_visible_input() {
 }
 
 void prompt_password(std::string *out_password, int mode) {
-  int c, password_size, i = 0;
+  int c, password_size = 32, i = 0;
   std::string password, confirmed_password;
 
   toggle_visible_input();
