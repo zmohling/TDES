@@ -101,8 +101,8 @@ static void toggle_visible_input() {
 }
 
 void prompt_password(std::string *out_password, int mode) {
-  int i = 0;
-  int c;
+  int c, password_size, i = 0;
+  std::string password, confirmed_password;
 
   toggle_visible_input();
 
@@ -117,17 +117,16 @@ void prompt_password(std::string *out_password, int mode) {
         << std::endl;
   }
 
-  uint8_t SIZE = 32;
-  std::string password, confirmed_password;
-
+  /* Prompt user for password and parse/store it */
   std::cout << "Enter a password: ";
-  for (i = 0; (c = getchar()) != '\n' && c != EOF && i < SIZE; i++) {
+  for (i = 0; (c = getchar()) != '\n' && c != EOF && i < password_size; i++) {
     password.push_back((char)c);
   }
   password.push_back((char)'\0');
 
+  /* Prompt user to confirm password and parse/store it */
   std::cout << std::endl << "Confirm password: ";
-  for (i = 0; (c = getchar()) != '\n' && c != EOF && i < SIZE; i++) {
+  for (i = 0; (c = getchar()) != '\n' && c != EOF && i < password_size; i++) {
     confirmed_password.push_back((char)c);
   }
   confirmed_password.push_back((char)'\0');
@@ -135,6 +134,7 @@ void prompt_password(std::string *out_password, int mode) {
   std::cout << std::endl;
   toggle_visible_input();
 
+  /* Confirm that passwords match */
   if (password.compare(confirmed_password) == 0) {
     *out_password = password;
   } else {
@@ -149,9 +149,10 @@ void get_key(uint8_t key[8], int mode) {
 
   const char *pass = password.c_str();
 
+  /* Derive key from password using PBKDF2 with SHA512 */
   if (!(PKCS5_PBKDF2_HMAC(pass, strlen(pass), NULL, 0, 1000, EVP_sha512(), 8,
                           key))) {
-    fprintf(stderr, "Error while calculated password hash. ERROR: %d", errno);
+    fprintf(stderr, "Error while deriving key from password. ERROR: %d", errno);
     exit(-1);
   }
 }
@@ -159,11 +160,13 @@ void get_key(uint8_t key[8], int mode) {
 void print_progress(int _progress, int mode) {
   static int progress = 0, init = 0;
 
-  if (_progress == progress)  // stop multiple calls for the same percent
+  /* Prevent printing if percentage hasn't changed */
+  if (_progress == progress)
     return;
   else
     progress = _progress;
 
+  /* Toggle user input */
   if (init == 0) {
     toggle_visible_input();
     init = 1;
@@ -187,7 +190,6 @@ void print_progress(int _progress, int mode) {
   }
 
   std::cout << "] " << progress << "%\r";
-
   std::cout.flush();
 
   if (progress == 100) {
