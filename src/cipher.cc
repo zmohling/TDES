@@ -1,3 +1,20 @@
+/*
+ *  Copyright (C) 2019 Zachary Mohling
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "cipher.h"
 
 #include <limits.h>
@@ -100,7 +117,6 @@ void Cipher::encrypt(uint8_t *out, const uint8_t *in,
 
   int round;
   for (round = 0; round < 16; round++) {
-
     feistel_function(right_block, sub_keys[round], T1);
 
     exclusive_or(4, left_block, T1, left_block);
@@ -125,7 +141,6 @@ void Cipher::decrypt(uint8_t *out, const uint8_t *in,
 
   int round;
   for (round = 15; round >= 0; round--) {
-
     feistel_function(right_block, sub_keys[round], T1);
 
     exclusive_or(4, left_block, T1, left_block);
@@ -141,12 +156,12 @@ void Cipher::decrypt(uint8_t *out, const uint8_t *in,
 }
 
 void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
-    int i;
-    for (i = 0; i < bytes; i++) {
-        uint8_t temp = left_block[i];
-        left_block[i] = right_block[i];
-        right_block[i] = temp;
-    }
+  int i;
+  for (i = 0; i < bytes; i++) {
+    uint8_t temp = left_block[i];
+    left_block[i] = right_block[i];
+    right_block[i] = temp;
+  }
 }
 
 void Cipher::feistel_function(const uint8_t *in_block, const uint8_t *round_key,
