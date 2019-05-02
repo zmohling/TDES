@@ -1,51 +1,36 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <algorithm>
+#include <stdlib.h>
 #include <string.h>
+#include <algorithm>
 #include <bitset>
 #include <iostream>
-#include <fstream>
 #include <vector>
 
 #include "cipher.h"
+#include "io.h"
 #include "key_generator.h"
 
 using namespace std;
 
-
-char* getCmdOption(char ** begin, char ** end, const std::string & option) {
-    char ** itr = std::find(begin, end, option);
-    if (itr != end && ++itr != end) {
-        return *itr;
-    }
-    return 0;
+char *getCmdOption(char **begin, char **end, const std::string &option) {
+  char **itr = std::find(begin, end, option);
+  if (itr != end && ++itr != end) {
+    return *itr;
+  }
+  return 0;
 }
 
-bool cmdOptionExists(char** begin, char** end, const std::string& option) {
-    return std::find(begin, end, option) != end;
+bool cmdOptionExists(char **begin, char **end, const std::string &option) {
+  return std::find(begin, end, option) != end;
 }
 
-int main(int argc, char *argv[]) {
-
-  if (argc != 4) {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -1;
-  }
-
-  int mode = 0; // 0 for encrypt, 1 for decrypt
-  std::string in_file_name(argv[2]), out_file_name(argv[3]);
-
-  if (cmdOptionExists(argv, argv+argc, "-enc")) {
-      mode = 0;
-  } else if(cmdOptionExists(argv, argv+argc, "-dec")) {
-      mode = 1;
-  } else {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-  }
-
+/* Driving function. The crypto function accepts the parsed user inputs from *
+ * main and applies the DES cryptography algorithm. The process loads bytes  *
+ * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
+int crypto(int mode, std::string *in_file_name, std::string *out_file_name) {
   Cipher c;
   KeyGenerator k;
 
@@ -53,36 +38,49 @@ int main(int argc, char *argv[]) {
   uint8_t sub_keys[16][6];
   k.generate(key, sub_keys);
 
-  uint8_t ciphertext[8];
-  char *buffer;
-  uint64_t filelen;
+  uint8_t *read_buffer;
+  uint64_t length = 16, cur_length = 0;
 
-  FILE *in_file_ptr;
-  in_file_ptr = fopen(in_file_name.c_str(), "rb");
-  fseek(in_file_ptr, 0, SEEK_END);
-  filelen = ftell(in_file_ptr);
-  rewind(in_file_ptr);
-  buffer = (char *)malloc((filelen+1)*sizeof(char));
-  fread(buffer, filelen, 1, in_file_ptr);
-  fclose(in_file_ptr);
+  load_buffer_from_disk(*in_file_name, &read_buffer, &length);
 
-  FILE *out_file_ptr;
-  out_file_ptr = fopen(out_file_name.c_str(), "wb");
+  uint8_t *write_buffer = (uint8_t *)malloc((length + 1) * sizeof(uint8_t));
 
-  uint64_t cur_len = 0;
-  while ((cur_len + 8) <= filelen) {
+  while ((cur_length + 8) <= length) {
     if (mode == 0) {
-      c.encrypt(ciphertext, (const uint8_t *)buffer, sub_keys);
+      c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
     } else {
-      c.decrypt(ciphertext, (const uint8_t *)buffer, sub_keys);
+      c.decrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
     }
 
-    fwrite(ciphertext, 8, 1, out_file_ptr);
-
-    buffer+=8; cur_len+=8;
+    cur_length += 8;
   }
 
-  fclose(out_file_ptr);
+  free(read_buffer);
+
+  write_buffer_to_disk(*out_file_name, &write_buffer, &length);
+
+  return 0;
+}
+
+int main(int argc, char *argv[]) {
+  if (argc != 4) {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -1;
+  }
+
+  int mode = 0;  // 0 for encrypt, 1 for decrypt
+  std::string in_file_name(argv[2]), out_file_name(argv[3]);
+
+  if (cmdOptionExists(argv, argv + argc, "-enc")) {
+    mode = 0;
+  } else if (cmdOptionExists(argv, argv + argc, "-dec")) {
+    mode = 1;
+  } else {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -2;
+  }
+
+  crypto(mode, &in_file_name, &out_file_name);
 }
 
 /*
@@ -104,7 +102,8 @@ std::string sub_keys_str[16] = {
     "111100001011111000100110101000010000001000110101",
     "111100001011111000100110101000110100001010000000"};
 
-std::string encrypted_val = "0010101010001101011010011101111010011101010111111101111111111001";
+std::string encrypted_val =
+"0010101010001101011010011101111010011101010111111101111111111001";
 
 static void bytes_to_bitset48(const uint8_t *bytes, std::bitset<48> *b) {
   for (int i = 0; i < 6; ++i) {
@@ -137,6 +136,8 @@ static void encryption_test() {
   KeyGenerator k;
 
   const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  //uint8_t plaintext[16] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+  //                         'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'};
   const char plaintext[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
   uint8_t ciphertext[8];
 
@@ -155,10 +156,8 @@ static void encryption_test() {
   cout << "Encrypted: " << encrypted_bits.to_string() << endl;
 
   if (encrypted_bits.to_string().compare(encrypted_val) != 0) {
-      string error = "Encryption error: " + encrypted_bits.to_string() + " should be " +
-                     encrypted_val + ".";
-      cout << error << endl;
-      throw error;
+      string error = "Encryption error: " + encrypted_bits.to_string() + "
+should be " + encrypted_val + "."; cout << error << endl; throw error;
   }
 
   //------------decryption--------------

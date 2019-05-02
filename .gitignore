@@ -5,6 +5,7 @@ lib/
 data/temp
 tests/tests
 *.txt
+CPPLINT.cfg
 
 # Debuggin
 valgrind*
