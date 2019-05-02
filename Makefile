@@ -30,7 +30,7 @@ INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 DEBUG_FLAGS=-Wall -ggdb3
 C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
 CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11
-LD_FLAGS=-lm
+LD_FLAGS=-lm -lssl -lcrypto
 
 # Sources, objects, and dependencies
 C_SRC=$(shell find $(SRC_DIR) -name '*.c')

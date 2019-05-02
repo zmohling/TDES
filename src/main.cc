@@ -34,12 +34,15 @@ int crypto(int mode, std::string *in_file_name, std::string *out_file_name) {
   Cipher c;
   KeyGenerator k;
 
-  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  /* Get password from the user, derive a 64-bit key from the input with     *
+   * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
+  uint8_t key[8];
   uint8_t sub_keys[16][6];
+  get_key(key);
   k.generate(key, sub_keys);
 
   uint8_t *read_buffer;
-  uint64_t length = 16, cur_length = 0;
+  uint64_t length, cur_length = 0;
 
   load_buffer_from_disk(*in_file_name, &read_buffer, &length);
 

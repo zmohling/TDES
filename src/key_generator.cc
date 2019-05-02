@@ -32,7 +32,7 @@ const uint8_t bit_rotation[] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
 
 KeyGenerator::KeyGenerator() {}
 
-void KeyGenerator::generate(const char *key_with_parities,
+void KeyGenerator::generate(const uint8_t *key_with_parities,
                             uint8_t round_keys[16][6]) {
   uint8_t T1[7], T2[7];
   uint64_t left_key = 0, right_key = 0;
