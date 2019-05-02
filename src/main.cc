@@ -30,24 +30,16 @@
 #include "io.h"
 #include "key_generator.h"
 
-using namespace std;
-
-char *getCmdOption(char **begin, char **end, const std::string &option) {
-  char **itr = std::find(begin, end, option);
-  if (itr != end && ++itr != end) {
-    return *itr;
-  }
-  return 0;
-}
-
-bool cmdOptionExists(char **begin, char **end, const std::string &option) {
+static bool does_option_exist(char **begin, char **end,
+                              const std::string &option) {
   return std::find(begin, end, option) != end;
 }
 
 /* Driving function. The crypto function accepts the parsed user inputs from *
  * main and applies the DES cryptography algorithm. The process loads bytes  *
  * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
-int crypto(int mode, std::string *in_file_name, std::string *out_file_name) {
+static int crypto(int mode, std::string *in_file_name,
+                  std::string *out_file_name) {
   Cipher c;
   KeyGenerator k;
 
@@ -55,11 +47,12 @@ int crypto(int mode, std::string *in_file_name, std::string *out_file_name) {
    * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
   uint8_t key[8];
   uint8_t sub_keys[16][6];
-  get_key(key);
+  get_key(key, mode);
   k.generate(key, sub_keys);
 
   uint8_t *read_buffer;
   uint64_t length, cur_length = 0;
+  uint64_t progress = 0;
 
   load_buffer_from_disk(*in_file_name, &read_buffer, &length);
 
@@ -73,11 +66,16 @@ int crypto(int mode, std::string *in_file_name, std::string *out_file_name) {
     }
 
     cur_length += 8;
+
+    progress = (((float)cur_length) / ((float)length)) * 100;
+    print_progress(progress, mode);
   }
 
   free(read_buffer);
 
   write_buffer_to_disk(*out_file_name, &write_buffer, &length);
+
+  print_progress(100, mode);
 
   return 0;
 }
@@ -91,18 +89,25 @@ int main(int argc, char *argv[]) {
   int mode = 0;  // 0 for encrypt, 1 for decrypt
   std::string in_file_name(argv[2]), out_file_name(argv[3]);
 
-  if (cmdOptionExists(argv, argv + argc, "-enc")) {
+  if (does_option_exist(argv, argv + argc, "-enc")) {
     mode = 0;
-  } else if (cmdOptionExists(argv, argv + argc, "-dec")) {
+  } else if (does_option_exist(argv, argv + argc, "-dec")) {
     mode = 1;
   } else {
     fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
     return -2;
   }
 
+  if (is_original_file(out_file_name.c_str())) {
+    fprintf(stderr, "Aborting. This file already exists: %s\n",
+            out_file_name.c_str());
+    exit(-1);
+  }
+
   crypto(mode, &in_file_name, &out_file_name);
 }
 
+// Validation code
 /*
 std::string sub_keys_str[16] = {
     "111000001011111001100110000100110010101010000010",
@@ -166,18 +171,18 @@ static void encryption_test() {
 
   bitset<64> original_bits;
   bytes_to_bitset64((const uint8_t *)plaintext, &original_bits);
-  cout << "Original : " << original_bits.to_string() << endl;
+  std::cout << "Original : " << original_bits.to_string() << std::endl;
 
   //-----------encryption-------------------
   c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
   bitset<64> encrypted_bits;
   bytes_to_bitset64(ciphertext, &encrypted_bits);
 
-  cout << "Encrypted: " << encrypted_bits.to_string() << endl;
+  std::cout << "Encrypted: " << encrypted_bits.to_string() << std::endl;
 
   if (encrypted_bits.to_string().compare(encrypted_val) != 0) {
       string error = "Encryption error: " + encrypted_bits.to_string() + "
-should be " + encrypted_val + "."; cout << error << endl; throw error;
+should be " + encrypted_val + "."; std::cout << error << std::endl; throw error;
   }
 
   //------------decryption--------------
@@ -187,7 +192,7 @@ should be " + encrypted_val + "."; cout << error << endl; throw error;
   bitset<64> decrypted_bits;
   bytes_to_bitset64(plain, &decrypted_bits);
 
-  cout << "Decrypted: " << decrypted_bits.to_string() << endl;
+  std::cout << "Decrypted: " << decrypted_bits.to_string() << std::endl;
 
 
   int i;
@@ -199,7 +204,7 @@ should be " + encrypted_val + "."; cout << error << endl; throw error;
     if (sub_key.compare(sub_keys_str[i]) != 0) {
       string error = " - Key generation error: " + sub_key + " should be " +
                      sub_keys_str[i] + ".";
-      cout << i << error << endl;
+      std::cout << i << error << std::endl;
       throw error;
     }
   }
