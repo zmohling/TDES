@@ -26,8 +26,6 @@
 #include <iostream>
 #include <vector>
 
-using namespace std;
-
 /* Prototypes */
 static void bytes_to_bitset48(const uint8_t *bytes, std::bitset<48> *b);
 
@@ -108,87 +106,96 @@ const uint8_t S8[] = {13, 2,  8, 4,  6,  15, 11, 1,  10, 9, 3, 14, 5,
 Cipher::Cipher() {}
 
 void Cipher::encrypt(uint8_t *out, const uint8_t *in,
-                     const uint8_t sub_keys[16][6]) {
-  uint8_t T[8], left_block[4], right_block[4], T1[4], T3[8];
+                     const uint8_t sub_keys[NUM_ROUNDS][SUBKEY_SIZE]) {
+  uint8_t permuted_in[BLOCK_SIZE], permuted_out[BLOCK_SIZE],
+      left_block[BLOCK_SIZE / 2], right_block[BLOCK_SIZE / 2],
+      fiestel_right_block[BLOCK_SIZE / 2];
 
-  permute(8, 8, in, T, IP);
+  permute(BLOCK_SIZE, BLOCK_SIZE, in, permuted_in, IP);
 
-  split(8, 4, T, left_block, right_block);
+  split(BLOCK_SIZE, BLOCK_SIZE / 2, permuted_in, left_block, right_block);
 
   int round;
-  for (round = 0; round < 16; round++) {
-    feistel_function(right_block, sub_keys[round], T1);
+  for (round = 0; round < NUM_ROUNDS; round++) {
+    feistel_function(right_block, sub_keys[round], fiestel_right_block);
 
-    exclusive_or(4, left_block, T1, left_block);
+    exclusive_or(BLOCK_SIZE / 2, left_block, fiestel_right_block, left_block);
 
-    if (round != 15) {
-      swapper(4, left_block, right_block);
+    if (round != (NUM_ROUNDS - 1)) {
+      swapper(BLOCK_SIZE / 2, (uint8_t **)&left_block,
+              (uint8_t **)&right_block);
     }
   }
 
-  combine(4, 8, left_block, right_block, T3);
+  combine(BLOCK_SIZE / 2, BLOCK_SIZE, left_block, right_block, permuted_out);
 
-  permute(8, 8, T3, out, FP);
+  permute(BLOCK_SIZE, BLOCK_SIZE, permuted_out, out, FP);
 }
 
 void Cipher::decrypt(uint8_t *out, const uint8_t *in,
-                     const uint8_t sub_keys[16][6]) {
-  uint8_t T[8], left_block[4], right_block[4], T1[4], T3[8];
+                     const uint8_t sub_keys[NUM_ROUNDS][SUBKEY_SIZE]) {
+  uint8_t permuted_in[BLOCK_SIZE], permuted_out[BLOCK_SIZE],
+      left_block[BLOCK_SIZE / 2], right_block[BLOCK_SIZE / 2],
+      fiestel_right_block[BLOCK_SIZE / 2];
 
-  permute(8, 8, in, T, IP);
+  permute(BLOCK_SIZE, BLOCK_SIZE, in, permuted_in, IP);
 
-  split(8, 4, T, left_block, right_block);
+  split(BLOCK_SIZE, BLOCK_SIZE / 2, permuted_in, left_block, right_block);
 
   int round;
-  for (round = 15; round >= 0; round--) {
-    feistel_function(right_block, sub_keys[round], T1);
+  for (round = (NUM_ROUNDS - 1); round >= 0; round--) {
+    feistel_function(right_block, sub_keys[round], fiestel_right_block);
 
-    exclusive_or(4, left_block, T1, left_block);
+    exclusive_or(BLOCK_SIZE / 2, left_block, fiestel_right_block, left_block);
 
     if (round != 0) {
-      swapper(4, left_block, right_block);
+      swapper(BLOCK_SIZE / 2, (uint8_t **)&left_block,
+              (uint8_t **)&right_block);
     }
   }
 
-  combine(4, 8, left_block, right_block, T3);
+  combine(BLOCK_SIZE / 2, BLOCK_SIZE, left_block, right_block, permuted_out);
 
-  permute(8, 8, T3, out, FP);
+  permute(BLOCK_SIZE, BLOCK_SIZE, permuted_out, out, FP);
 }
 
-void Cipher::swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block) {
-  int i;
-  for (i = 0; i < bytes; i++) {
-    uint8_t temp = left_block[i];
-    left_block[i] = right_block[i];
-    right_block[i] = temp;
-  }
+void Cipher::swapper(uint8_t bytes, uint8_t **left_block,
+                     uint8_t **right_block) {
+  uint8_t *temp = *left_block;
+  *left_block = *right_block;
+  *right_block = temp;
 }
 
 void Cipher::feistel_function(const uint8_t *in_block, const uint8_t *round_key,
                               uint8_t *out_block) {
-  uint8_t T1[6], T2[6], T3[4];
+  uint8_t permuted_in_block[EXPANSION_SIZE], exclusive_or_block[EXPANSION_SIZE],
+      substituted_block[BLOCK_SIZE / 2];
 
-  permute(4, 6, in_block, T1, E);  // expansion
+  permute(BLOCK_SIZE / 2, EXPANSION_SIZE, in_block, permuted_in_block,
+          E);  // expansion
 
-  exclusive_or(6, T1, round_key, T2);
+  exclusive_or(EXPANSION_SIZE, permuted_in_block, round_key,
+               exclusive_or_block);
 
-  substitute(T2, T3);
+  substitute(exclusive_or_block, substituted_block);
 
-  permute(4, 4, T3, out_block, P);
+  permute(BLOCK_SIZE / 2, BLOCK_SIZE / 2, substituted_block, out_block, P);
 }
 
 void Cipher::substitute(const uint8_t *in_block, uint8_t *out_block) {
   const uint8_t *substitution_boxes[] = {S1, S2, S3, S4, S5, S6, S7, S8};
 
-  std::bitset<48> bits;
+  std::bitset<EXPANSION_SIZE * 8> bits;
   bytes_to_bitset48(in_block, &bits);
 
-  int i, j = 0, bit = 47;
-  for (i = 0; i < 8; i++, bit -= 6) {
+  int i, j = 0, bit = (EXPANSION_SIZE * 8) - 1;
+  for (i = 0; i < NUM_SUB_BOXES; i++, bit -= EXPANSION_SIZE) {
     uint8_t row = (bits[bit] * 2) + (bits[bit - 5] * 1);
     uint8_t column = (bits[bit - 1] * 8) + (bits[bit - 2] * 4) +
                      (bits[bit - 3] * 2) + (bits[bit - 4] * 1);
 
+    /* Shift the first 4-bit number to the left side of the byte. *
+     * On the second subsitution, put the 4-bit num on the right. */
     if (i % 2 == 0) {
       out_block[j] = 0;
       out_block[j] |= (((substitution_boxes[i][(row * 16) + column])) << 4);

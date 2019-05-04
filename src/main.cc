@@ -30,85 +30,7 @@
 #include "io.h"
 #include "key_generator.h"
 
-static bool does_option_exist(char **begin, char **end,
-                              const std::string &option) {
-  return std::find(begin, end, option) != end;
-}
-
-/* Driving function. The crypto function accepts the parsed user inputs from *
- * main and applies the DES cryptography algorithm. The process loads bytes  *
- * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
-static int crypto(int mode, std::string *in_file_name,
-                  std::string *out_file_name) {
-  Cipher c;
-  KeyGenerator k;
-
-  /* Get password from the user, derive a 64-bit key from the input with     *
-   * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
-  uint8_t key[8];
-  uint8_t sub_keys[16][6];
-  get_key(key, mode);
-  k.generate(key, sub_keys);
-
-  uint8_t *read_buffer;
-  uint64_t length, cur_length = 0;
-  uint64_t progress = 0;
-
-  load_buffer_from_disk(*in_file_name, &read_buffer, &length);
-
-  uint8_t *write_buffer = (uint8_t *)malloc((length + 1) * sizeof(uint8_t));
-
-  while ((cur_length + 8) <= length) {
-    if (mode == 0) {
-      c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    } else {
-      c.decrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    }
-
-    cur_length += 8;
-
-    progress = (((float)cur_length) / ((float)length)) * 100;
-    print_progress(progress, mode);
-  }
-
-  free(read_buffer);
-
-  write_buffer_to_disk(*out_file_name, &write_buffer, &length);
-
-  print_progress(100, mode);
-
-  return 0;
-}
-
-int main(int argc, char *argv[]) {
-  if (argc != 4) {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -1;
-  }
-
-  int mode = 0;  // 0 for encrypt, 1 for decrypt
-  std::string in_file_name(argv[2]), out_file_name(argv[3]);
-
-  if (does_option_exist(argv, argv + argc, "-enc")) {
-    mode = 0;
-  } else if (does_option_exist(argv, argv + argc, "-dec")) {
-    mode = 1;
-  } else {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -2;
-  }
-
-  if (is_original_file(out_file_name.c_str())) {
-    fprintf(stderr, "Aborting. This file already exists: %s\n",
-            out_file_name.c_str());
-    exit(-1);
-  }
-
-  crypto(mode, &in_file_name, &out_file_name);
-}
-
 // Validation code
-/*
 std::string sub_keys_str[16] = {
     "111000001011111001100110000100110010101010000010",
     "111000001011011001110110000100000010001100000111",
@@ -128,7 +50,7 @@ std::string sub_keys_str[16] = {
     "111100001011111000100110101000110100001010000000"};
 
 std::string encrypted_val =
-"0010101010001101011010011101111010011101010111111101111111111001";
+    "0010101010001101011010011101111010011101010111111101111111111001";
 
 static void bytes_to_bitset48(const uint8_t *bytes, std::bitset<48> *b) {
   for (int i = 0; i < 6; ++i) {
@@ -160,8 +82,8 @@ static void encryption_test() {
   Cipher c;
   KeyGenerator k;
 
-  const char key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-  //uint8_t plaintext[16] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+  const uint8_t key[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+  // uint8_t plaintext[16] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
   //                         'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'};
   const char plaintext[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
   uint8_t ciphertext[8];
@@ -169,44 +91,145 @@ static void encryption_test() {
   uint8_t sub_keys[16][6];
   k.generate(key, sub_keys);
 
-  bitset<64> original_bits;
+  std::bitset<64> original_bits;
   bytes_to_bitset64((const uint8_t *)plaintext, &original_bits);
-  std::cout << "Original : " << original_bits.to_string() << std::endl;
+  // std::cout << "Original : " << original_bits.to_string() << std::endl;
 
   //-----------encryption-------------------
   c.encrypt(ciphertext, (const uint8_t *)plaintext, sub_keys);
-  bitset<64> encrypted_bits;
+  std::bitset<64> encrypted_bits;
   bytes_to_bitset64(ciphertext, &encrypted_bits);
 
-  std::cout << "Encrypted: " << encrypted_bits.to_string() << std::endl;
+  // std::cout << "Encrypted: " << encrypted_bits.to_string() << std::endl;
 
   if (encrypted_bits.to_string().compare(encrypted_val) != 0) {
-      string error = "Encryption error: " + encrypted_bits.to_string() + "
-should be " + encrypted_val + "."; std::cout << error << std::endl; throw error;
+    std::string error = "Encryption error: " + encrypted_bits.to_string() +
+                        "should be " + encrypted_val + ".";
+    std::cout << error << std::endl;
+    throw error;
   }
 
   //------------decryption--------------
 
   uint8_t plain[8];
   c.decrypt(plain, (const uint8_t *)ciphertext, sub_keys);
-  bitset<64> decrypted_bits;
+  std::bitset<64> decrypted_bits;
   bytes_to_bitset64(plain, &decrypted_bits);
 
-  std::cout << "Decrypted: " << decrypted_bits.to_string() << std::endl;
+  // std::cout << "Decrypted: " << decrypted_bits.to_string() << std::endl;
 
+  if (original_bits != decrypted_bits) {
+    throw "Bits don't match";
+  }
 
   int i;
   for (i = 0; i < 16; i++) {
-    bitset<48> sub_key_bits;
+    std::bitset<48> sub_key_bits;
     bytes_to_bitset48(sub_keys[i], &sub_key_bits);
-    string sub_key = sub_key_bits.to_string();
+    std::string sub_key = sub_key_bits.to_string();
 
     if (sub_key.compare(sub_keys_str[i]) != 0) {
-      string error = " - Key generation error: " + sub_key + " should be " +
-                     sub_keys_str[i] + ".";
+      std::string error = " - Key generation error: " + sub_key +
+                          " should be " + sub_keys_str[i] + ".";
       std::cout << i << error << std::endl;
       throw error;
     }
   }
 }
-*/
+
+static bool does_option_exist(char **begin, char **end,
+                              const std::string &option) {
+  return std::find(begin, end, option) != end;
+}
+
+/* Driving function. The crypto function accepts the parsed user inputs from *
+ * main and applies the DES cryptography algorithm. The process loads bytes  *
+ * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
+static int crypto(int mode, std::string *in_file_name,
+                  std::string *out_file_name) {
+  Cipher c;
+  KeyGenerator k;
+
+  /* Get password from the user, derive a 64-bit key from the input with     *
+   * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
+  uint8_t key[8];
+  uint8_t sub_keys[16][6];
+  get_key(key, mode);
+  k.generate(key, sub_keys);
+
+  uint8_t *read_buffer;
+  uint64_t length, cur_length = 0;
+  uint64_t progress = 0;
+
+  load_buffer_from_disk(*in_file_name, &read_buffer, &length);
+
+  uint8_t PKCS5_PADDING = 8 - (length % 8);
+  uint8_t *write_buffer =
+      (uint8_t *)malloc((length + PKCS5_PADDING) * sizeof(uint8_t));
+
+  while ((cur_length + 8) <= length) {
+    if (mode == 0) {
+      c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
+    } else {
+      c.decrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
+    }
+
+    cur_length += 8;
+
+    progress = (((float)cur_length) / ((float)length)) * 100;
+    print_progress(progress, mode);
+  }
+
+  /* PKCS#5 Padding on last block */
+  if (mode == 0) {
+    int i;
+    for (i = 0; i < PKCS5_PADDING; i++) {
+      read_buffer[cur_length + (8 - PKCS5_PADDING) + i] = PKCS5_PADDING;
+    }
+
+    length += PKCS5_PADDING;
+
+    c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
+
+  } else {
+    length -= write_buffer[cur_length - 1];
+  }
+
+  free(read_buffer);
+
+  write_buffer_to_disk(*out_file_name, &write_buffer, &length);
+
+  print_progress(100, mode);
+
+  return 0;
+}
+
+int main(int argc, char *argv[]) {
+  // encryption_test();
+  // return 0;
+
+  if (argc != 4) {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -1;
+  }
+
+  int mode = 0;  // 0 for encrypt, 1 for decrypt
+  std::string in_file_name(argv[2]), out_file_name(argv[3]);
+
+  if (does_option_exist(argv, argv + argc, "-enc")) {
+    mode = 0;
+  } else if (does_option_exist(argv, argv + argc, "-dec")) {
+    mode = 1;
+  } else {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -2;
+  }
+
+  if (is_original_file(out_file_name.c_str())) {
+    fprintf(stderr, "Aborting. This file already exists: %s\n",
+            out_file_name.c_str());
+    exit(-1);
+  }
+
+  crypto(mode, &in_file_name, &out_file_name);
+}

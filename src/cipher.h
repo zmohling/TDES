@@ -20,6 +20,14 @@
 
 #include <stdint.h>
 
+#define NUM_ROUNDS 16
+#define NUM_SUB_BOXES 8
+#define BLOCK_SIZE 8          // in bytes
+#define KEY_SIZE 8            // in bytes
+#define KEY_SIZE_NO_PARITY 7  // in bytes
+#define SUBKEY_SIZE 6         // in bytes
+#define EXPANSION_SIZE 6      // in bytes
+
 class Cipher {
  public:
   Cipher();
@@ -29,7 +37,7 @@ class Cipher {
   void decrypt(uint8_t *out, const uint8_t *in, const uint8_t sub_keys[16][6]);
 
  private:
-  void swapper(uint8_t bytes, uint8_t *left_block, uint8_t *right_block);
+  void swapper(uint8_t bytes, uint8_t **left_block, uint8_t **right_block);
 
   void feistel_function(const uint8_t *in_block, const uint8_t *round_key,
                         uint8_t *out_block);

@@ -15,8 +15,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef IO_H_
-#define IO_H_
+#ifndef IO_IO_H_
+#define IO_IO_H_
 
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -54,7 +54,10 @@ void load_buffer_from_disk(std::string path, uint8_t **buffer,
   *length = ftell(in_file_ptr);
   rewind(in_file_ptr);
 
-  if (!(*buffer = (uint8_t *)malloc((*length + 1) * sizeof(uint8_t)))) {
+  int PKCS5_PADDING = 8 - (*length % 8);
+
+  if (!(*buffer =
+            (uint8_t *)malloc((*length + PKCS5_PADDING) * sizeof(uint8_t)))) {
     fprintf(stderr, "Insufficient memory for %s. ERROR: %d\n", path.c_str(),
             errno);
     exit(-1);
@@ -198,4 +201,4 @@ void print_progress(int _progress, int mode) {
   }
 }
 
-#endif  // IO_H_
+#endif  // IO_IO_H_

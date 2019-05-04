@@ -1,0 +1,19 @@
+### TO-DO: TDES ###
+ - Fix 64 bit truncation at EOF
+ - Full TDES implementation DES -> TDES
+ - Mode of Operation (confidentiality and authenticity)
+    - Message authentication code?
+    - Initialization vector
+    - Chaining / Feedback
+    - Padding on last block
+ - Metadata insertion (authentication & integrity data, algorithm, mode of operation, version) 
+ - Lower memory cost: read and write x number of bytes at a time
+ - Checksum at EOF to validate successful encryption/decryption
+ - Multithreading for concurrent encryption/decryption
+ - Rid magic numbers with preprocessor defines
+ - Increase progress status accuracy by including read, write, and key generation
+ - Performance testing. Compare with other implementations and optimize
+ - Documentation with Doxygen
+ - Consider building as a <popular *nix package manager> package.
+ - Cross-platform compatible with Windows and OSX
+ - Implement header file for use as a library
