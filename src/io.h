@@ -150,11 +150,11 @@ void print_progress(int _progress, int mode) {
   static int progress = 0, init = 0;
 
   /* Prevent printing if percentage hasn't changed */
-  if (_progress <= progress)
+  if (_progress <= progress || _progress % 2 != 0)
     return;
   else {
     progress = _progress;
-    std::cout << "%\r";
+    std::cout << "\r";
     std::cout.flush();
   }
 

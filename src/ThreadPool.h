@@ -124,8 +124,9 @@ class ThreadPool {
       bailout = true;
       job_available_var.notify_all();
 
-      for (auto &x : threads)
+      for (auto &x : threads) {
         if (x.joinable()) x.join();
+      }
       finished = true;
     }
   }
