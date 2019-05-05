@@ -26,10 +26,46 @@
 #include <iostream>
 #include <vector>
 
-#include "cipher.h"
-#include "io.h"
-#include "key_generator.h"
+#include "tdes.h"
 
+static bool does_option_exist(char **begin, char **end,
+                              const std::string &option) {
+  return std::find(begin, end, option) != end;
+}
+
+int main(int argc, char *argv[]) {
+  // encryption_test();
+  // return 0;
+
+  if (argc != 4) {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -1;
+  }
+
+  int mode = 0;  // 0 for encrypt, 1 for decrypt
+  std::string in_file_name(argv[2]), out_file_name(argv[3]);
+
+  if (does_option_exist(argv, argv + argc, "-enc")) {
+    mode = 0;
+  } else if (does_option_exist(argv, argv + argc, "-dec")) {
+    mode = 1;
+  } else {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -2;
+  }
+  /*
+    if (is_original_file(out_file_name.c_str())) {
+      fprintf(stderr, "Aborting. This file already exists: %s\n",
+              out_file_name.c_str());
+      exit(-1);
+    }
+  */
+  TDES tdes;
+  tdes.run(mode, &in_file_name, &out_file_name);
+}
+
+/*
+ *
 // Validation code
 std::string sub_keys_str[16] = {
     "111000001011111001100110000100110010101010000010",
@@ -136,100 +172,4 @@ static void encryption_test() {
     }
   }
 }
-
-static bool does_option_exist(char **begin, char **end,
-                              const std::string &option) {
-  return std::find(begin, end, option) != end;
-}
-
-/* Driving function. The crypto function accepts the parsed user inputs from *
- * main and applies the DES cryptography algorithm. The process loads bytes  *
- * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
-static int crypto(int mode, std::string *in_file_name,
-                  std::string *out_file_name) {
-  Cipher c;
-  KeyGenerator k;
-
-  /* Get password from the user, derive a 64-bit key from the input with     *
-   * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
-  uint8_t key[8];
-  uint8_t sub_keys[16][6];
-  get_key(key, mode);
-  k.generate(key, sub_keys);
-
-  uint8_t *read_buffer;
-  uint64_t length, cur_length = 0;
-  uint64_t progress = 0;
-
-  load_buffer_from_disk(*in_file_name, &read_buffer, &length);
-
-  uint8_t PKCS5_PADDING = 8 - (length % 8);
-  uint8_t *write_buffer =
-      (uint8_t *)malloc((length + PKCS5_PADDING) * sizeof(uint8_t));
-
-  while ((cur_length + 8) <= length) {
-    if (mode == 0) {
-      c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    } else {
-      c.decrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    }
-
-    cur_length += 8;
-
-    progress = (((float)cur_length) / ((float)length)) * 100;
-    print_progress(progress, mode);
-  }
-
-  /* PKCS#5 Padding on last block */
-  if (mode == 0) {
-    int i;
-    for (i = 0; i < PKCS5_PADDING; i++) {
-      read_buffer[cur_length + (8 - PKCS5_PADDING) + i] = PKCS5_PADDING;
-    }
-
-    length += PKCS5_PADDING;
-
-    c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-
-  } else {
-    length -= write_buffer[cur_length - 1];
-  }
-
-  free(read_buffer);
-
-  write_buffer_to_disk(*out_file_name, &write_buffer, &length);
-
-  print_progress(100, mode);
-
-  return 0;
-}
-
-int main(int argc, char *argv[]) {
-  // encryption_test();
-  // return 0;
-
-  if (argc != 4) {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -1;
-  }
-
-  int mode = 0;  // 0 for encrypt, 1 for decrypt
-  std::string in_file_name(argv[2]), out_file_name(argv[3]);
-
-  if (does_option_exist(argv, argv + argc, "-enc")) {
-    mode = 0;
-  } else if (does_option_exist(argv, argv + argc, "-dec")) {
-    mode = 1;
-  } else {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -2;
-  }
-
-  if (is_original_file(out_file_name.c_str())) {
-    fprintf(stderr, "Aborting. This file already exists: %s\n",
-            out_file_name.c_str());
-    exit(-1);
-  }
-
-  crypto(mode, &in_file_name, &out_file_name);
-}
+*/

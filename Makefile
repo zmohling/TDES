@@ -31,8 +31,8 @@ INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 # Compilation and linking flags
 DEBUG_FLAGS=-Wall -ggdb3
 C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
-CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11
-LD_FLAGS=-lm -lssl -lcrypto
+CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11 -pthread
+LD_FLAGS=-lm -lpthread -lssl -lcrypto
 
 # Sources, objects, and dependencies
 C_SRC=$(shell find $(SRC_BASE_DIR) -name '*.c')

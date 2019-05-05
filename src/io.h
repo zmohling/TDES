@@ -15,8 +15,8 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef IO_IO_H_
-#define IO_IO_H_
+#ifndef IO_H_
+#define IO_H_
 
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -146,28 +146,17 @@ void prompt_password(std::string *out_password, int mode) {
   }
 }
 
-void get_key(uint8_t key[8], int mode) {
-  std::string password;
-  prompt_password(&password, mode);
-
-  const char *pass = password.c_str();
-
-  /* Derive key from password using PBKDF2 with SHA512 */
-  if (!(PKCS5_PBKDF2_HMAC(pass, strlen(pass), NULL, 0, 1000, EVP_sha512(), 8,
-                          key))) {
-    fprintf(stderr, "Error while deriving key from password. ERROR: %d", errno);
-    exit(-1);
-  }
-}
-
 void print_progress(int _progress, int mode) {
   static int progress = 0, init = 0;
 
   /* Prevent printing if percentage hasn't changed */
-  if (_progress == progress)
+  if (_progress <= progress)
     return;
-  else
+  else {
     progress = _progress;
+    std::cout << "%\r";
+    std::cout.flush();
+  }
 
   /* Toggle user input */
   if (init == 0) {
@@ -201,4 +190,4 @@ void print_progress(int _progress, int mode) {
   }
 }
 
-#endif  // IO_IO_H_
+#endif  // IO_H_
