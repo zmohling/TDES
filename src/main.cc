@@ -60,8 +60,7 @@ int main(int argc, char *argv[]) {
       exit(-1);
     }
   */
-  TDES tdes;
-  tdes.run(mode, &in_file_name, &out_file_name);
+  run(mode, &in_file_name, &out_file_name);
 }
 
 /*

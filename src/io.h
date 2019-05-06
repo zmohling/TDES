@@ -36,38 +36,70 @@
 #include <iostream>
 #include <string>
 
+#define BUFFER_SIZE 4096
+#define NUM_BUFFERS 16
+
 int is_original_file(const char *filename) {
   struct stat st;
   int result = stat(filename, &st);
   return result == 0;
 }
 
-void load_buffer_from_disk(std::string path, uint8_t **buffer,
-                           uint64_t *length) {
-  FILE *in_file_ptr;
-  if (!(in_file_ptr = fopen(path.c_str(), "rb"))) {
+void open_file(FILE **file, std::string path, const char *mode,
+               uint64_t *total_length) {
+  if (!(*file = fopen(path.c_str(), mode))) {
     fprintf(stderr, "Could not open file %s. ERROR: %d\n", path.c_str(), errno);
     exit(-1);
   }
 
-  fseek(in_file_ptr, 0, SEEK_END);
-  *length = ftell(in_file_ptr);
-  rewind(in_file_ptr);
-
-  int PKCS5_PADDING = 8 - (*length % 8);
-
-  if (!(*buffer =
-            (uint8_t *)malloc((*length + PKCS5_PADDING) * sizeof(uint8_t)))) {
-    fprintf(stderr, "Insufficient memory for %s. ERROR: %d\n", path.c_str(),
-            errno);
-    exit(-1);
+  if (strcmp(mode, "rb") == 0) {
+    fseek(*file, 0, SEEK_END);
+    *total_length = ftell(*file);
+    rewind(*file);
   }
-
-  fread(*buffer, *length, 1, in_file_ptr);
-
-  fclose(in_file_ptr);
 }
 
+void read_into_buffer_block(FILE **file, uint8_t **buffer, uint8_t num_bytes,
+                            uint64_t *current_length, uint64_t *total_length) {
+  uint32_t size = 0;
+
+  if (*current_length + num_bytes <= *total_length) {
+    size = BUFFER_SIZE;
+  } else {
+    size = *total_length - *current_length;
+  }
+
+  if (!fread(*buffer, size, 1, *file)) {
+    fprintf(stderr, "Error: could not load block starting at %lu. ERROR: %d\n",
+            *current_length, errno);
+    exit(-7);
+  }
+
+  // fclose(in_file_ptr);
+}
+
+void write_buffer_to_disk(FILE **file, uint8_t **buffer, uint8_t num_bytes,
+                          uint64_t *current_length) {
+  static int init = 0;
+
+  if (init == 0) {
+    if (!(*buffer = (uint8_t *)malloc((BUFFER_SIZE) * sizeof(uint8_t)))) {
+      fprintf(stderr, "Insufficient memory. ERROR: %d\n", errno);
+      exit(-1);
+    }
+
+    init = 1;
+  }
+
+  if (!fwrite(*buffer, num_bytes, 1, *file)) {
+    fprintf(stderr, "Error: could not write block starting at %lu. ERROR: %d\n",
+            *current_length, errno);
+    exit(-8);
+  }
+
+  // fclose(in_file_ptr);
+}
+/*
 void write_buffer_to_disk(std::string path, uint8_t **buffer,
                           uint64_t *length) {
   FILE *out_file_ptr;
@@ -82,7 +114,7 @@ void write_buffer_to_disk(std::string path, uint8_t **buffer,
 
   fclose(out_file_ptr);
 }
-
+*/
 static void toggle_visible_input() {
   static struct termios oldt, newt;
   static bool stalled = false;
