@@ -1,7 +1,6 @@
 # Project specific paths
 tdes
 build/
-lib/
 data/temp
 tests/tests
 *.mp4
@@ -38,7 +37,6 @@ core
 *.lai
 *.la
 *.a
-*.lib
 
 # Executables
 *.exe
