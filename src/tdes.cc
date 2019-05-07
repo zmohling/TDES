@@ -24,7 +24,7 @@
 #include <thread>
 #include <vector>
 
-#include "ThreadPool.h"
+#include "../lib/ThreadPool.h"
 #include "cipher.h"
 #include "io.h"
 #include "key_generator.h"
