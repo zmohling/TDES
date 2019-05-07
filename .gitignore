@@ -1,7 +1,6 @@
 # Project specific paths
 tdes
 build/
-lib/
 data/temp
 tests/tests
 *.mp4
