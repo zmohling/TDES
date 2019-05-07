@@ -14,182 +14,159 @@
 
 static std::mutex mtx;  // mutex for queues
 
+/* DES Cipher */
 static Cipher cipher;
+
+/* DES Key Generator */
 static KeyGenerator keygen;
 
 /* Subkeys of the 3 keys */
 static uint8_t K1[16][6], K2[16][6], K3[16][6];
 
+/* File pointers to our source and destination files */
 static FILE *in_file, *out_file;
 
+/* Circular buffer */
 static uint8_t *buffer;
-static uint64_t file_length, write_length, processed_length;
+
+/* Pointers which point to a chunk of data in buffer. R points to the *
+ * next chunk to read data into from disk, while W points to the next *
+ * chunk which to read from the buffer and write to disk.             */
 static uint32_t R = 0, W = 0;
 
+static uint64_t file_length, write_length, processed_length;
+
+/* Queue of pointers to 8-byte blocks to be encrypted/decrypted. Queue*
+ * gets populated by the read_task.                                   */
 static std::priority_queue<uint8_t *> read_queue;
-static std::map<uint8_t *, callback_container> write_queue;
 
+/* Map of pointer-to-chunk keys, will value struct that accounts for *
+ * the numbers of jobs (encrypting a block) to complete and callback *
+ * for a block in the chunk. When callback_container.num_callbacks ==*
+ * callback_container.num_expected_callbacks, entry will be erased   *
+ * from the map, and the chunk will be written to disk.              */
+static std::map<uint8_t *, callback_container> write_map;
+
+/* Add padding the last block of the file. To PKCS#5 specification.  */
 static void add_PKCS5_padding(uint8_t *block) {
-  uint8_t PKCS5_PADDING = 8 - (file_length % 8);
-
-  int i;
+  uint8_t i, PKCS5_PADDING = 8 - (file_length % 8);
   for (i = 0; i < PKCS5_PADDING; i++) {
     block[(8 - PKCS5_PADDING) + i] = PKCS5_PADDING;
   }
 }
 
+/* Driving function. Calls IO functions to derive keys from user's    *
+ * password, opens files, allocates buffer. Contains loop for reading *
+ * in data, adding jobs to the thread pool, and writing data.         */
 void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   init_keys(&keygen, K1, K2, K3, mode);
 
   open_file(&in_file, *in_file_name, "rb", &file_length);
   open_file(&out_file, *out_file_name, "wb", NULL);
 
+  /* Adjust write_length if encrypting for padding */
   if (mode == 0) {
-    write_length =
-        file_length +
-        (BLOCK_SIZE - (file_length % BLOCK_SIZE));  // round to even block size
+    /* round to even 8-byte block size */
+    write_length = file_length + (BLOCK_SIZE - (file_length % BLOCK_SIZE));
   } else {
     write_length = file_length;
   }
 
-  /*
-    if (!(buffer = (uint8_t *)malloc(total_length * sizeof(uint8_t)))) {
-      fprintf(stderr, "Insufficient memory. ERROR: %d\n", errno);
-      exit(-1);
-    }
-  */
+  /* Allocate memory for our 16-chunk, 2^16 bit circular buffer */
   if (!(buffer =
             (uint8_t *)malloc(BUFFER_SIZE * NUM_BUFFERS * sizeof(uint8_t)))) {
     fprintf(stderr, "Insufficient memory. ERROR: %d\n", errno);
     exit(-1);
   }
-  /*
-    {
-      ThreadPool pool(10);
 
-      auto result = pool.enqueue(read_task, &in_file, &buffer, &read_queue,
-                                 total_length, &current_length, &total_length);
-      result.get();
+  /* Thread pool for encryption and decryption operations */
+  ThreadPool pool(8);
 
-      while ((current_length + 8) <= total_length) {
-        if (mode == 0) {
-          pool.enqueue(encrypt_task, &buffer[current_length], &cipher, K1, K2,
-                       K3);
-        } else {
-          pool.enqueue(decrypt_task, &buffer[current_length], &cipher, K1, K2,
-                       K3);
-        }
+  static int init = 0;
+  while (true) {
+    if (((R % 16) != (W % 16) && (processed_length < file_length)) || !init) {
+      init = 1;
 
-        current_length += 8;
+      uint32_t start_byte = ((R % NUM_BUFFERS) * BUFFER_SIZE);
+      uint32_t end_byte = ((R * BUFFER_SIZE) + BUFFER_SIZE > write_length)
+                              ? start_byte + (write_length % BUFFER_SIZE)
+                              : start_byte + BUFFER_SIZE;
+
+      /* Utilize thread pool for reading to save on thread-creation costs */
+      auto read = pool.enqueue(read_task, buffer + start_byte,
+                               (uint32_t)(end_byte - start_byte));
+      read.get();
+
+      /* Add callback container. Expected callbacks is equal to the number *
+       * of threads we'll spawn for this chunk. (BUFFER_SIZE / 8)          */
+      callback_container c;
+      c.num_callbacks = 0;
+      c.num_expected_callbacks =
+          (uint32_t)(((end_byte - start_byte) - 1) / BLOCK_SIZE +
+                     1);  // round-up integer division
+
+      /* Add padding to last block of file. This padding ensures that the *
+       * total new file length will evenly divide into BLOCK_SIZE. Padding*
+       * is to PKCS#5 specification.                                      */
+      if ((write_length - (R * BUFFER_SIZE) < BUFFER_SIZE) && mode == 0) {
+        add_PKCS5_padding(buffer + start_byte +
+                          ((c.num_expected_callbacks - 1) * BLOCK_SIZE));
       }
+
+      /* Add pointer to chunk and callback to map */
+      write_map[buffer + start_byte] = c;
+
+      R++;
+
+      processed_length += (uint32_t)(end_byte - start_byte);
     }
-    int i;
-    for (i = 0; i < total_length; i++) {
-      printf("%c", buffer[i]);
+
+    /* Add any queued pointers (to a 8-byte block in buffer) to threadpool *
+     * job queue.                                                          */
+    while (!read_queue.empty()) {
+      if (mode == 0)
+        pool.enqueue(encrypt_task, read_queue.top());
+      else
+        pool.enqueue(decrypt_task, read_queue.top());
+
+      read_queue.pop();
     }
 
-  write_task(&out_file, &buffer, &read_queue, total_length, &current_length,
-             &total_length);
+    /* Check if threads spawned for encryting/decrypting chunk W have all *
+     * completed by ensuring num_callbacks == num_expected_callbacks. If  *
+     * so, write completed chunk W to disk. If decrypting, change         *
+     * num_bytes to reflect de-padding the last 8-byte block.             */
 
-  */
-  {
-    static int init = 0;
+    callback_container callback =
+        write_map[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]];
 
-    ThreadPool pool(8);
-    while (true) {
-      if (((R % 16) != (W % 16) && processed_length < file_length) || !init) {
-        init = 1;
+    if (callback.num_callbacks == callback.num_expected_callbacks) {
+      uint32_t num_bytes = callback.num_expected_callbacks * 8;
 
-        uint32_t start_byte = ((R % NUM_BUFFERS) * BUFFER_SIZE);
-        uint32_t end_byte = (start_byte + BUFFER_SIZE > write_length)
-                                ? write_length
-                                : start_byte + BUFFER_SIZE;
-
-        std::cout << "Loading bytes " << start_byte << " through " << end_byte
-                  << std::endl;
-
-        std::thread read(read_task, buffer + start_byte,
-                         (uint32_t)(end_byte - start_byte));
-        read.join();
-
-        /* Add callback container. Expected callbacks is equal to the number *
-         * of threads we'll spawn for this chunk. (BUFFER_SIZE / 8)          */
-        callback_container c;
-        c.num_callbacks = 0;
-        c.num_expected_callbacks =
-            (uint32_t)(((end_byte - start_byte) - 1) / BLOCK_SIZE +
-                       1);  // round-up integer division
-
-        if ((write_length - (R * BUFFER_SIZE) < BUFFER_SIZE) && mode == 0) {
-          add_PKCS5_padding(buffer + start_byte +
-                            ((c.num_expected_callbacks - 1) * BLOCK_SIZE));
-        }
-
-        write_queue[buffer + start_byte] = c;
-
-        /*
-                std::cout << "Chunk " << start_byte << "'s Expected Callbacks: "
-                          << write_queue[buffer +
-           start_byte].num_expected_callbacks
-                          << std::endl;
-        */
-        R++;
-        processed_length += (uint32_t)(end_byte - start_byte);
+      /* If last block, de-pad by shortening the length of the write     *
+       * operation.                                                      */
+      if (((W * BUFFER_SIZE) + num_bytes == file_length) && mode == 1) {
+        num_bytes -= buffer[(file_length % (BUFFER_SIZE * NUM_BUFFERS)) - 1];
       }
 
-      while (!read_queue.empty()) {
-        /*
-        pool.enqueue(
-            encrypt_task, (uint8_t *)read_queue.top(), &cipher,
-            (std::map<const uint8_t *, callback_container> *)&write_queue, K1,
-            K2, K3);
-            */
-        if (mode == 0)
-          pool.enqueue(encrypt_task, (uint8_t *)read_queue.top());
-        else
-          pool.enqueue(decrypt_task, (uint8_t *)read_queue.top());
+      /* Utilize thread pool for writing to save on thread-creation costs*/
+      auto write = pool.enqueue(
+          write_task, buffer + ((W % NUM_BUFFERS) * BUFFER_SIZE), num_bytes);
+      write.get();
 
-        read_queue.pop();
-      }
+      W++;
 
-      if (write_queue.size() > 0 &&
-          write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]].num_callbacks ==
-              write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
-                  .num_expected_callbacks) {
-        std::cout << "Writing blocks: " << (W % NUM_BUFFERS) * BUFFER_SIZE
-                  << " through "
-                  << (W % NUM_BUFFERS) * BUFFER_SIZE +
-                         (write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
-                              .num_expected_callbacks *
-                          8)
-                  << std::endl;
-
-        uint32_t num_bytes =
-            write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
-                .num_expected_callbacks *
-            8;
-
-        if ((((W % 16) * BUFFER_SIZE) + num_bytes == file_length) &&
-            mode == 1) {
-          num_bytes -= buffer[file_length - 1];
-          write_length -= buffer[file_length - 1];
-        }
-
-        std::thread write(write_task, buffer + ((W % 16) * BUFFER_SIZE),
-                          num_bytes);
-        write.join();
-
-        W++;
-
-        if (W == R) break;
-      }
-      // TODO: Write Logic
+      /* If reading has stopped, W (write) will eventually catch-up to   *
+       * R (read) location. That means we're done.                       */
+      if (W == R) break;
     }
   }
-  // std::cout << "Write pointers: " << write_queue.size() << std::endl;
 }
 
+/* Read a chunk into the circular buffer. For each block read, add a     *
+ * pointer to the read_queue.                                            */
 void read_task(uint8_t *buffer, uint32_t num_bytes) {
+  /* Bounds checking */
   int read_size;
   if (processed_length + num_bytes <= file_length) {
     read_size = num_bytes;
@@ -203,14 +180,19 @@ void read_task(uint8_t *buffer, uint32_t num_bytes) {
     exit(-7);
   }
 
+  /* Add pointers to each block to read_queue */
   mtx.lock();
+
   uint32_t i = 0;
   for (i = 0; i < num_bytes; i += 8) {
     read_queue.push(&buffer[i]);
   }
+
   mtx.unlock();
 }
 
+/* Write a chunk to disk from the cirular queue. On completiion, delete *
+ * pointer to that chunk.                                               */
 void write_task(uint8_t *buffer, uint32_t num_bytes) {
   if (!fwrite(buffer, num_bytes, 1, out_file)) {
     printf("Error: could not write block starting at %lu. %s.\n",
@@ -218,11 +200,16 @@ void write_task(uint8_t *buffer, uint32_t num_bytes) {
     exit(-7);
   }
 
+  /* Erase chunk-pointer key from write_map */
   mtx.lock();
-  write_queue.erase(buffer);
+
+  write_map.erase(buffer);
+
   mtx.unlock();
 }
 
+/* Initialize set of keys for Triple DES. Derives the cumulative 24    *
+ * bytes from user's password.                                         */
 void init_keys(KeyGenerator *keygen, uint8_t K1[16][6], uint8_t K2[16][6],
                uint8_t K3[16][6], int mode) {
   std::string password;
@@ -230,7 +217,6 @@ void init_keys(KeyGenerator *keygen, uint8_t K1[16][6], uint8_t K2[16][6],
   prompt_password(&password, mode);
 
   uint8_t K[24];
-  // memset(K, 0, 24);
 
   /* Derive key from password using PBKDF2 with SHA512 */
   if (!(PKCS5_PBKDF2_HMAC(password.c_str(), password.length(), NULL, 0, 100000,
@@ -239,11 +225,15 @@ void init_keys(KeyGenerator *keygen, uint8_t K1[16][6], uint8_t K2[16][6],
     exit(-1);
   }
 
+  /* Generate set of 16 subkeys from the set of 8-byte keys */
   keygen->generate(K, K1);
   keygen->generate(K + 8, K2);
   keygen->generate(K + 16, K3);
 }
 
+/* Encrypt the block. On completion, remove block from read_queue and *
+ * add increment the num_callbacks member of the callback_container   *
+ * value of write_map.                                                */
 void encrypt_task(uint8_t *block) {
   uint8_t T1[8], T2[8];
 
@@ -252,22 +242,16 @@ void encrypt_task(uint8_t *block) {
   cipher.encrypt(block, T2, K3);
 
   mtx.lock();
-  write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+
+  write_map[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
       .num_callbacks++;
-  /*
-  std::cout << "Encrypted and Added " << (block - buffer) << " to write queue"
-            << std::endl;
-            */
-  /*
-  std::cout
-      << "Callbacks increased to "
-      << write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
-             .num_callbacks
-      << " at " << ((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE << std::endl;
-      */
+
   mtx.unlock();
 }
 
+/* Decrypt the block. On completion, remove block from read_queue and *
+ * add increment the num_callbacks member of the callback_container   *
+ * value of write_map.                                                */
 void decrypt_task(uint8_t *block) {
   uint8_t T1[8], T2[8];
 
@@ -276,18 +260,9 @@ void decrypt_task(uint8_t *block) {
   cipher.decrypt(block, T2, K1);
 
   mtx.lock();
-  write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+
+  write_map[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
       .num_callbacks++;
-  /*
-  std::cout << "Encrypted and Added " << (block - buffer) << " to write queue"
-            << std::endl;
-            */
-  /*
-  std::cout
-      << "Callbacks increased to "
-      << write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
-             .num_callbacks
-      << " at " << ((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE << std::endl;
-      */
+
   mtx.unlock();
 }
