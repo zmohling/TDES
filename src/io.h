@@ -37,9 +37,9 @@
 #include <mutex>
 #include <string>
 
-#define VERSION_NO "1.0.0"
+#define VERSION_NO "1.0.1"
 
-int is_original_file(const char *filename) {
+int file_exists(const char *filename) {
   struct stat st;
   int result = stat(filename, &st);
   return result == 0;
@@ -100,7 +100,7 @@ void prompt_password(std::string *out_password, int mode) {
               << std::endl;
   } else {
     std::cout << "*** Warning: Decrypting with the incorrect key will corrupt "
-                 "output file ***"
+                 "the output file ***"
               << std::endl;
   }
 
