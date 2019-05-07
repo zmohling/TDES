@@ -12,35 +12,33 @@ BIN=tdes
 
 # Directories 
 DEST_DIR=/
-INSTALL_DIR=usr/local/bin
 ROOT_DIR=.
-SRC_DIR=$(ROOT_DIR)/src
-SUB_DIRS=$(sort $(dir $(wildcard $(SRC_DIR)/*/)))
+LIB_DIR=$(ROOT_DIR)/lib
+SRC_BASE_DIR=$(ROOT_DIR)/src
+SRC_SUB_DIRS=$(sort $(dir $(wildcard $(SRC_BASE_DIR)/*/)))
+INSTALL_DIR=usr/local/bin
 
 # Generated directories
 BUILD_DIR=$(ROOT_DIR)/build
-LIB_DIR=$(ROOT_DIR)/lib
-#GEN_DIRS=$(BUILD_DIR) $(LIB_DIR)
 
 # Libaries
 LIBS=$(shell find $(LIB_DIR) -name '*.a')
 
 # Include
-INC_DIRS=$(SRC_DIR)
+INC_DIRS=$(SRC_BASE_DIR)
 INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 
 # Compilation and linking flags
 DEBUG_FLAGS=-Wall -ggdb3
 C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
-CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11
-LD_FLAGS=-lm -lssl -lcrypto
+CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11 -pthread
+LD_FLAGS=-lm -lpthread -lssl -lcrypto
 
 # Sources, objects, and dependencies
-C_SRC=$(shell find $(SRC_DIR) -name '*.c')
-CXX_SRC=$(shell find $(SRC_DIR) -name '*.cc')
+C_SRC=$(shell find $(SRC_BASE_DIR) -name '*.c')
+CXX_SRC=$(shell find $(SRC_BASE_DIR) -name '*.cc')
 OBJ=$(patsubst %.c, $(BUILD_DIR)/%.o, $(filter %.c,$(subst /, , $(C_SRC)))) \
 	$(patsubst %.cc, $(BUILD_DIR)/%.o, $(filter %.cc,$(subst /, , $(CXX_SRC))))
-MAINS=$(BUILD_DIR)/main.o
 DEP=$(OBJ:%.o=%.d)
 
 all: $(BIN)
@@ -51,18 +49,18 @@ $(BIN): $(OBJ)
 
 -include $(DEP)
 
-$(BUILD_DIR)/%.o: $(SUB_DIRS)%.c | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(SRC_SUB_DIRS)%.c | $(BUILD_DIR)
 	@$(ECHO) Compiling $<
 	@$(CC) $(C_FLAGS) -MMD -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(SUB_DIRS)%.cc | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(SRC_SUB_DIRS)%.cc | $(BUILD_DIR)
 	@$(ECHO) Compiling $<
 	@$(CXX) $(CXX_FLAGS) -MMD -c $< -o $@
 
 .PHONY: clean lint install uninstall
 clean:
 	@$(ECHO) Removing all generated files and executables...
-	@$(RM) $(BUILD_DIR) $(BIN) *.txt core vgcore.* valgrind*
+	@$(RM) $(BUILD_DIR) $(BIN) *.txt *.mp4 core vgcore.* valgrind*
 
 lint:
 	@$(ECHO) Linting source files per Google\'s CXX Styleguide...

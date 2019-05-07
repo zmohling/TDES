@@ -23,61 +23,15 @@
 #include <string.h>
 #include <algorithm>
 #include <bitset>
+#include <ctime>
 #include <iostream>
 #include <vector>
 
-#include "cipher.h"
-#include "io.h"
-#include "key_generator.h"
+#include "tdes.h"
 
 static bool does_option_exist(char **begin, char **end,
                               const std::string &option) {
   return std::find(begin, end, option) != end;
-}
-
-/* Driving function. The crypto function accepts the parsed user inputs from *
- * main and applies the DES cryptography algorithm. The process loads bytes  *
- * into a buffer, encrypts or decrypts them, and writes them to a new file.  */
-static int crypto(int mode, std::string *in_file_name,
-                  std::string *out_file_name) {
-  Cipher c;
-  KeyGenerator k;
-
-  /* Get password from the user, derive a 64-bit key from the input with     *
-   * PBKDF2, and generate the 16 sub-keys. (One for each round).             */
-  uint8_t key[8];
-  uint8_t sub_keys[16][6];
-  get_key(key, mode);
-  k.generate(key, sub_keys);
-
-  uint8_t *read_buffer;
-  uint64_t length, cur_length = 0;
-  uint64_t progress = 0;
-
-  load_buffer_from_disk(*in_file_name, &read_buffer, &length);
-
-  uint8_t *write_buffer = (uint8_t *)malloc((length + 1) * sizeof(uint8_t));
-
-  while ((cur_length + 8) <= length) {
-    if (mode == 0) {
-      c.encrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    } else {
-      c.decrypt(&write_buffer[cur_length], &read_buffer[cur_length], sub_keys);
-    }
-
-    cur_length += 8;
-
-    progress = (((float)cur_length) / ((float)length)) * 100;
-    print_progress(progress, mode);
-  }
-
-  free(read_buffer);
-
-  write_buffer_to_disk(*out_file_name, &write_buffer, &length);
-
-  print_progress(100, mode);
-
-  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -98,11 +52,13 @@ int main(int argc, char *argv[]) {
     return -2;
   }
 
-  if (is_original_file(out_file_name.c_str())) {
-    fprintf(stderr, "Aborting. This file already exists: %s\n",
-            out_file_name.c_str());
-    exit(-1);
-  }
+  /*
+    if (is_original_file(out_file_name.c_str())) {
+      fprintf(stderr, "Aborting. This file already exists: %s\n",
+              out_file_name.c_str());
+      exit(-1);
+    }
+  */
 
-  crypto(mode, &in_file_name, &out_file_name);
+  run(mode, &in_file_name, &out_file_name);
 }

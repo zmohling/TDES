@@ -4,6 +4,7 @@ build/
 lib/
 data/temp
 tests/tests
+*.mp4
 *.txt
 CPPLINT.cfg
 

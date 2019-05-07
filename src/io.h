@@ -34,7 +34,10 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <string>
+
+static std::mutex progress_mtx;
 
 int is_original_file(const char *filename) {
   struct stat st;
@@ -42,42 +45,18 @@ int is_original_file(const char *filename) {
   return result == 0;
 }
 
-void load_buffer_from_disk(std::string path, uint8_t **buffer,
-                           uint64_t *length) {
-  FILE *in_file_ptr;
-  if (!(in_file_ptr = fopen(path.c_str(), "rb"))) {
+void open_file(FILE **file, std::string path, const char *mode,
+               uint64_t *total_length) {
+  if (!(*file = fopen(path.c_str(), mode))) {
     fprintf(stderr, "Could not open file %s. ERROR: %d\n", path.c_str(), errno);
     exit(-1);
   }
 
-  fseek(in_file_ptr, 0, SEEK_END);
-  *length = ftell(in_file_ptr);
-  rewind(in_file_ptr);
-
-  if (!(*buffer = (uint8_t *)malloc((*length + 1) * sizeof(uint8_t)))) {
-    fprintf(stderr, "Insufficient memory for %s. ERROR: %d\n", path.c_str(),
-            errno);
-    exit(-1);
+  if (strcmp(mode, "rb") == 0) {
+    fseek(*file, 0, SEEK_END);
+    *total_length = ftell(*file);
+    rewind(*file);
   }
-
-  fread(*buffer, *length, 1, in_file_ptr);
-
-  fclose(in_file_ptr);
-}
-
-void write_buffer_to_disk(std::string path, uint8_t **buffer,
-                          uint64_t *length) {
-  FILE *out_file_ptr;
-  if (!(out_file_ptr = fopen(path.c_str(), "wb"))) {
-    fprintf(stderr, "Could not open file %s. ERROR: %d\n", path.c_str(), errno);
-    exit(-1);
-  }
-
-  fwrite(*buffer, *length, 1, out_file_ptr);
-
-  free(*buffer);
-
-  fclose(out_file_ptr);
 }
 
 static void toggle_visible_input() {
@@ -143,28 +122,19 @@ void prompt_password(std::string *out_password, int mode) {
   }
 }
 
-void get_key(uint8_t key[8], int mode) {
-  std::string password;
-  prompt_password(&password, mode);
-
-  const char *pass = password.c_str();
-
-  /* Derive key from password using PBKDF2 with SHA512 */
-  if (!(PKCS5_PBKDF2_HMAC(pass, strlen(pass), NULL, 0, 1000, EVP_sha512(), 8,
-                          key))) {
-    fprintf(stderr, "Error while deriving key from password. ERROR: %d", errno);
-    exit(-1);
-  }
-}
-
 void print_progress(int _progress, int mode) {
-  static int progress = 0, init = 0;
+  static int progress = -1, init = 0;
+
+  // progress_mtx.lock();
 
   /* Prevent printing if percentage hasn't changed */
-  if (_progress == progress)
+  if (_progress <= progress)
     return;
-  else
+  else {
     progress = _progress;
+    std::cout << "\r";
+    std::cout.flush();
+  }
 
   /* Toggle user input */
   if (init == 0) {
@@ -196,6 +166,8 @@ void print_progress(int _progress, int mode) {
     std::cout << std::endl;
     toggle_visible_input();
   }
+
+  // progress_mtx.unlock();
 }
 
 #endif  // IO_H_
