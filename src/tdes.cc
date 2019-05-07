@@ -1,6 +1,7 @@
 #include "tdes.h"
 
 #include <chrono>
+#include <map>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -11,98 +12,24 @@
 #include "io.h"
 #include "key_generator.h"
 
-std::mutex mtx;  // mutex for queues
+static std::mutex mtx;  // mutex for queues
 
-void encrypt_task(uint8_t *block, Cipher *cipher,
-                  std::priority_queue<uint8_t *> *queue, uint8_t K1[16][6],
-                  uint8_t K2[16][6], uint8_t K3[16][6]) {
-  uint8_t T1[8], T2[8];
+static Cipher cipher;
+static KeyGenerator keygen;
 
-  cipher->encrypt(T1, block, K1);
-  cipher->decrypt(T2, T1, K2);
-  cipher->encrypt(block, T2, K3);
+/* Subkeys of the 3 keys */
+static uint8_t K1[16][6], K2[16][6], K3[16][6];
 
-  mtx.lock();
-  queue->push(block);
-  mtx.unlock();
-}
+static FILE *in_file, *out_file;
 
-void decrypt_task(uint8_t *block, Cipher *cipher,
-                  std::priority_queue<uint8_t *> *queue, uint8_t K1[16][6],
-                  uint8_t K2[16][6], uint8_t K3[16][6]) {
-  uint8_t T1[8], T2[8];
+static uint8_t *buffer;
+static uint64_t total_length, current_length;
+static uint32_t R = 0, W = 0;
 
-  cipher->decrypt(T1, block, K3);
-  cipher->encrypt(T2, T1, K2);
-  cipher->decrypt(block, T2, K1);
-
-  mtx.lock();
-  queue->push(block);
-  mtx.unlock();
-}
-
-void read_task(FILE **file, uint8_t *buffer,
-               std::priority_queue<uint8_t *> *queue, uint32_t num_bytes,
-               uint64_t *current_length, uint64_t *total_length) {
-  int read_size;
-  if (*current_length + num_bytes <= *total_length) {
-    read_size = num_bytes;
-  } else {
-    read_size = *total_length - *current_length;
-  }
-
-  if (!fread(buffer, read_size, 1, *file)) {
-    printf("Error: could not read block starting at %lu. %s.\n",
-           *current_length, strerror(errno));
-    exit(-7);
-  }
-
-  uint32_t i = 0;
-  for (i = 0; i < num_bytes; i += 8) {
-    queue->push(&buffer[i]);
-  }
-}
-
-void write_task(FILE **file, uint8_t *buffer,
-                std::priority_queue<uint8_t *> *queue, uint32_t num_bytes,
-                uint64_t *current_length, uint64_t *total_length) {
-  /*
-  int write_size;
-  if (*current_length + num_bytes <= *total_length) {
-    write_size = num_bytes;
-  } else {
-    write_size = *total_length - *current_length;
-  }*/
-
-  if (!fwrite(buffer, *total_length, 1, *file)) {
-    printf("Error: could not write block starting at %lu. %s.\n",
-           *current_length, strerror(errno));
-    exit(-7);
-  }
-
-  uint32_t i = 0;
-  for (i = 0; i < num_bytes; i += 8) {
-    queue->pop();
-  }
-}
+static std::priority_queue<uint8_t *> read_queue;
+static std::map<uint8_t *, callback_container> write_queue;
 
 void run(int mode, std::string *in_file_name, std::string *out_file_name) {
-  Cipher cipher;
-  KeyGenerator keygen;
-
-  /* (3) 64-bit keys required by TDES */
-
-  /* Subkeys of the 3 keys */
-  uint8_t K1[16][6], K2[16][6], K3[16][6];
-
-  FILE *in_file, *out_file;
-
-  uint8_t *buffer;
-  uint64_t total_length, current_length;
-  uint32_t R = 0, W = 0;
-
-  std::priority_queue<uint8_t *> read_queue, write_queue;
-
   init_keys(&keygen, K1, K2, K3, mode);
   // uint8_t PKCS5_PADDING = 8 - (length % 8);
 
@@ -152,41 +79,131 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
     static int init = 0;
 
     ThreadPool pool(8);
-    while (current_length < total_length) {
-      if (R % 16 != W % 16 || !init) {
+    while (true) {
+      if ((R % 16 != W % 16 && current_length < total_length) || !init) {
         init = 1;
         uint32_t start_byte = ((R % NUM_BUFFERS) * BUFFER_SIZE);
-        uint32_t end_byte = (start_byte + (2 * BUFFER_SIZE) > total_length)
+        uint32_t end_byte = (start_byte + BUFFER_SIZE > total_length)
                                 ? total_length
-                                : start_byte + (2 * BUFFER_SIZE);
+                                : start_byte + BUFFER_SIZE;
+
         std::cout << "Loading bytes " << start_byte << " through " << end_byte
                   << std::endl;
+
         std::thread read(read_task, &in_file, buffer + start_byte, &read_queue,
                          (uint32_t)(end_byte - start_byte), &current_length,
                          &total_length);
         read.join();
 
-        std::cout << "Write pointers: " << write_queue.size() << std::endl;
-
-        R += 2;
+        /* Add callback container. Expected callbacks is equal to the number *
+         * of threads we'll spawn for this chunk. (BUFFER_SIZE / 8)          */
+        callback_container c;
+        c.num_callbacks = 0;
+        c.num_expected_callbacks =
+            (uint32_t)(((end_byte - start_byte) - 1) / 8 +
+                       1);  // round-up integer division
+        write_queue[buffer + start_byte] = c;
+        /*
+                std::cout << "Chunk " << start_byte << "'s Expected Callbacks: "
+                          << write_queue[buffer +
+           start_byte].num_expected_callbacks
+                          << std::endl;
+        */
+        R++;
       }
 
-      if (!read_queue.empty()) {
-        while (!read_queue.empty()) {
-          pool.enqueue(encrypt_task, (uint8_t *)read_queue.top(), &cipher,
-                       &write_queue, K1, K2, K3);
-          read_queue.pop();
-          current_length += 8;
-        }
+      while (!read_queue.empty()) {
+        /*
+        pool.enqueue(
+            encrypt_task, (uint8_t *)read_queue.top(), &cipher,
+            (std::map<const uint8_t *, callback_container> *)&write_queue, K1,
+            K2, K3);
+            */
+        if (mode == 0)
+          pool.enqueue(encrypt_task, (uint8_t *)read_queue.top());
+        else
+          pool.enqueue(decrypt_task, (uint8_t *)read_queue.top());
+
+        read_queue.pop();
+        current_length += 8;
       }
 
+      if (write_queue.size() > 0 &&
+          write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]].num_callbacks ==
+              write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
+                  .num_expected_callbacks) {
+        std::cout << "Writing blocks: " << (W % NUM_BUFFERS) * BUFFER_SIZE
+                  << " through "
+                  << (W % NUM_BUFFERS) * BUFFER_SIZE +
+                         (write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
+                              .num_expected_callbacks *
+                          8)
+                  << std::endl;
+
+        uint32_t num_bytes =
+            write_queue[&buffer[(W % NUM_BUFFERS) * BUFFER_SIZE]]
+                .num_expected_callbacks *
+            8;
+
+        std::thread write(write_task, &out_file,
+                          buffer + ((W % 16) * BUFFER_SIZE), &write_queue,
+                          num_bytes, &current_length, &total_length);
+        write.join();
+        W++;
+
+        if (W == R) break;
+      }
       // TODO: Write Logic
     }
   }
-  std::cout << "Write pointers: " << write_queue.size() << std::endl;
-  /*write_task(&out_file, buffer, &read_queue, total_length, &current_length,
-             &total_length);
-             */
+  // std::cout << "Write pointers: " << write_queue.size() << std::endl;
+}
+
+void read_task(FILE **file, uint8_t *buffer,
+               std::priority_queue<uint8_t *> *queue, uint32_t num_bytes,
+               uint64_t *current_length, uint64_t *total_length) {
+  int read_size;
+  if (*current_length + num_bytes <= *total_length) {
+    read_size = num_bytes;
+  } else {
+    read_size = *total_length - *current_length;
+  }
+
+  if (!fread(buffer, read_size, 1, *file)) {
+    printf("Error: could not read block starting at %lu. %s.\n",
+           *current_length, strerror(errno));
+    exit(-7);
+  }
+
+  mtx.lock();
+  uint32_t i = 0;
+  for (i = 0; i < num_bytes; i += 8) {
+    queue->push(&buffer[i]);
+  }
+  mtx.unlock();
+}
+
+void write_task(FILE **file, uint8_t *buffer,
+                std::map<uint8_t *, callback_container> *write_queue,
+                uint32_t num_bytes, uint64_t *current_length,
+                uint64_t *total_length) {
+  /*
+  int write_size;
+  if (*current_length + num_bytes <= *total_length) {
+    write_size = num_bytes;
+  } else {
+    write_size = *total_length - *current_length;
+  }*/
+
+  if (!fwrite(buffer, num_bytes, 1, *file)) {
+    printf("Error: could not write block starting at %lu. %s.\n",
+           *current_length, strerror(errno));
+    exit(-7);
+  }
+
+  mtx.lock();
+  write_queue->erase(buffer);
+  mtx.unlock();
 }
 
 void init_keys(KeyGenerator *keygen, uint8_t K1[16][6], uint8_t K2[16][6],
@@ -208,4 +225,52 @@ void init_keys(KeyGenerator *keygen, uint8_t K1[16][6], uint8_t K2[16][6],
   keygen->generate(K, K1);
   keygen->generate(K + 8, K2);
   keygen->generate(K + 16, K3);
+}
+
+void encrypt_task(uint8_t *block) {
+  uint8_t T1[8], T2[8];
+
+  cipher.encrypt(T1, block, K1);
+  cipher.decrypt(T2, T1, K2);
+  cipher.encrypt(block, T2, K3);
+
+  mtx.lock();
+  write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+      .num_callbacks++;
+  /*
+  std::cout << "Encrypted and Added " << (block - buffer) << " to write queue"
+            << std::endl;
+            */
+  /*
+  std::cout
+      << "Callbacks increased to "
+      << write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+             .num_callbacks
+      << " at " << ((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE << std::endl;
+      */
+  mtx.unlock();
+}
+
+void decrypt_task(uint8_t *block) {
+  uint8_t T1[8], T2[8];
+
+  cipher.decrypt(T1, block, K3);
+  cipher.encrypt(T2, T1, K2);
+  cipher.decrypt(block, T2, K1);
+
+  mtx.lock();
+  write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+      .num_callbacks++;
+  /*
+  std::cout << "Encrypted and Added " << (block - buffer) << " to write queue"
+            << std::endl;
+            */
+  /*
+  std::cout
+      << "Callbacks increased to "
+      << write_queue[buffer + (((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE)]
+             .num_callbacks
+      << " at " << ((block - buffer) / BUFFER_SIZE) * BUFFER_SIZE << std::endl;
+      */
+  mtx.unlock();
 }
