@@ -34,10 +34,10 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <string>
 
-#define BUFFER_SIZE 4096
-#define NUM_BUFFERS 16
+static std::mutex progress_mtx;
 
 int is_original_file(const char *filename) {
   struct stat st;
@@ -59,62 +59,6 @@ void open_file(FILE **file, std::string path, const char *mode,
   }
 }
 
-void read_into_buffer_block(FILE **file, uint8_t **buffer, uint8_t num_bytes,
-                            uint64_t *current_length, uint64_t *total_length) {
-  uint32_t size = 0;
-
-  if (*current_length + num_bytes <= *total_length) {
-    size = BUFFER_SIZE;
-  } else {
-    size = *total_length - *current_length;
-  }
-
-  if (!fread(*buffer, size, 1, *file)) {
-    fprintf(stderr, "Error: could not load block starting at %lu. ERROR: %d\n",
-            *current_length, errno);
-    exit(-7);
-  }
-
-  // fclose(in_file_ptr);
-}
-
-void write_buffer_to_disk(FILE **file, uint8_t **buffer, uint8_t num_bytes,
-                          uint64_t *current_length) {
-  static int init = 0;
-
-  if (init == 0) {
-    if (!(*buffer = (uint8_t *)malloc((BUFFER_SIZE) * sizeof(uint8_t)))) {
-      fprintf(stderr, "Insufficient memory. ERROR: %d\n", errno);
-      exit(-1);
-    }
-
-    init = 1;
-  }
-
-  if (!fwrite(*buffer, num_bytes, 1, *file)) {
-    fprintf(stderr, "Error: could not write block starting at %lu. ERROR: %d\n",
-            *current_length, errno);
-    exit(-8);
-  }
-
-  // fclose(in_file_ptr);
-}
-/*
-void write_buffer_to_disk(std::string path, uint8_t **buffer,
-                          uint64_t *length) {
-  FILE *out_file_ptr;
-  if (!(out_file_ptr = fopen(path.c_str(), "wb"))) {
-    fprintf(stderr, "Could not open file %s. ERROR: %d\n", path.c_str(), errno);
-    exit(-1);
-  }
-
-  fwrite(*buffer, *length, 1, out_file_ptr);
-
-  free(*buffer);
-
-  fclose(out_file_ptr);
-}
-*/
 static void toggle_visible_input() {
   static struct termios oldt, newt;
   static bool stalled = false;
@@ -179,10 +123,12 @@ void prompt_password(std::string *out_password, int mode) {
 }
 
 void print_progress(int _progress, int mode) {
-  static int progress = 0, init = 0;
+  static int progress = -1, init = 0;
+
+  // progress_mtx.lock();
 
   /* Prevent printing if percentage hasn't changed */
-  if (_progress <= progress || _progress % 2 != 0)
+  if (_progress <= progress)
     return;
   else {
     progress = _progress;
@@ -220,6 +166,8 @@ void print_progress(int _progress, int mode) {
     std::cout << std::endl;
     toggle_visible_input();
   }
+
+  // progress_mtx.unlock();
 }
 
 #endif  // IO_H_
