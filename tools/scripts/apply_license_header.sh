@@ -19,4 +19,3 @@ ROOT_DIR=$(cd ../../ && pwd)
 
 export -f apply
 find $ROOT_DIR/src/ -regex ".+\.\(c\|cc\|cpp\|h\|hpp\)$" -exec bash -c 'apply "$0"' {} \;
-find $ROOT_DIR/tests/ -regex ".+\.\(c\|cc\|cpp\|h\|hpp\)$" -exec bash -c 'apply "$0"' {} \;
