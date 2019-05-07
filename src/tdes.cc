@@ -23,18 +23,35 @@ static uint8_t K1[16][6], K2[16][6], K3[16][6];
 static FILE *in_file, *out_file;
 
 static uint8_t *buffer;
-static uint64_t total_length, current_length;
+static uint64_t file_length, write_length, processed_length;
 static uint32_t R = 0, W = 0;
 
 static std::priority_queue<uint8_t *> read_queue;
 static std::map<uint8_t *, callback_container> write_queue;
 
+static void add_PKCS5_padding(uint8_t *block) {
+  uint8_t PKCS5_PADDING = 8 - (file_length % 8);
+
+  int i;
+  for (i = 0; i < PKCS5_PADDING; i++) {
+    block[(8 - PKCS5_PADDING) + i] = PKCS5_PADDING;
+  }
+}
+
 void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   init_keys(&keygen, K1, K2, K3, mode);
-  // uint8_t PKCS5_PADDING = 8 - (length % 8);
 
-  open_file(&in_file, *in_file_name, "rb", &total_length);
+  open_file(&in_file, *in_file_name, "rb", &file_length);
   open_file(&out_file, *out_file_name, "wb", NULL);
+
+  if (mode == 0) {
+    write_length =
+        file_length +
+        (BLOCK_SIZE - (file_length % BLOCK_SIZE));  // round to even block size
+  } else {
+    write_length = file_length;
+  }
+
   /*
     if (!(buffer = (uint8_t *)malloc(total_length * sizeof(uint8_t)))) {
       fprintf(stderr, "Insufficient memory. ERROR: %d\n", errno);
@@ -80,19 +97,19 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
 
     ThreadPool pool(8);
     while (true) {
-      if ((R % 16 != W % 16 && current_length < total_length) || !init) {
+      if (((R % 16) != (W % 16) && processed_length < file_length) || !init) {
         init = 1;
+
         uint32_t start_byte = ((R % NUM_BUFFERS) * BUFFER_SIZE);
-        uint32_t end_byte = (start_byte + BUFFER_SIZE > total_length)
-                                ? total_length
+        uint32_t end_byte = (start_byte + BUFFER_SIZE > write_length)
+                                ? write_length
                                 : start_byte + BUFFER_SIZE;
 
         std::cout << "Loading bytes " << start_byte << " through " << end_byte
                   << std::endl;
 
-        std::thread read(read_task, &in_file, buffer + start_byte, &read_queue,
-                         (uint32_t)(end_byte - start_byte), &current_length,
-                         &total_length);
+        std::thread read(read_task, buffer + start_byte,
+                         (uint32_t)(end_byte - start_byte));
         read.join();
 
         /* Add callback container. Expected callbacks is equal to the number *
@@ -100,9 +117,16 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
         callback_container c;
         c.num_callbacks = 0;
         c.num_expected_callbacks =
-            (uint32_t)(((end_byte - start_byte) - 1) / 8 +
+            (uint32_t)(((end_byte - start_byte) - 1) / BLOCK_SIZE +
                        1);  // round-up integer division
+
+        if ((write_length - (R * BUFFER_SIZE) < BUFFER_SIZE) && mode == 0) {
+          add_PKCS5_padding(buffer + start_byte +
+                            ((c.num_expected_callbacks - 1) * BLOCK_SIZE));
+        }
+
         write_queue[buffer + start_byte] = c;
+
         /*
                 std::cout << "Chunk " << start_byte << "'s Expected Callbacks: "
                           << write_queue[buffer +
@@ -110,6 +134,7 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
                           << std::endl;
         */
         R++;
+        processed_length += (uint32_t)(end_byte - start_byte);
       }
 
       while (!read_queue.empty()) {
@@ -125,7 +150,6 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
           pool.enqueue(decrypt_task, (uint8_t *)read_queue.top());
 
         read_queue.pop();
-        current_length += 8;
       }
 
       if (write_queue.size() > 0 &&
@@ -145,10 +169,16 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
                 .num_expected_callbacks *
             8;
 
-        std::thread write(write_task, &out_file,
-                          buffer + ((W % 16) * BUFFER_SIZE), &write_queue,
-                          num_bytes, &current_length, &total_length);
+        if ((((W % 16) * BUFFER_SIZE) + num_bytes == file_length) &&
+            mode == 1) {
+          num_bytes -= buffer[file_length - 1];
+          write_length -= buffer[file_length - 1];
+        }
+
+        std::thread write(write_task, buffer + ((W % 16) * BUFFER_SIZE),
+                          num_bytes);
         write.join();
+
         W++;
 
         if (W == R) break;
@@ -159,50 +189,37 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   // std::cout << "Write pointers: " << write_queue.size() << std::endl;
 }
 
-void read_task(FILE **file, uint8_t *buffer,
-               std::priority_queue<uint8_t *> *queue, uint32_t num_bytes,
-               uint64_t *current_length, uint64_t *total_length) {
+void read_task(uint8_t *buffer, uint32_t num_bytes) {
   int read_size;
-  if (*current_length + num_bytes <= *total_length) {
+  if (processed_length + num_bytes <= file_length) {
     read_size = num_bytes;
   } else {
-    read_size = *total_length - *current_length;
+    read_size = file_length - processed_length;
   }
 
-  if (!fread(buffer, read_size, 1, *file)) {
+  if (!fread(buffer, read_size, 1, in_file)) {
     printf("Error: could not read block starting at %lu. %s.\n",
-           *current_length, strerror(errno));
+           processed_length, strerror(errno));
     exit(-7);
   }
 
   mtx.lock();
   uint32_t i = 0;
   for (i = 0; i < num_bytes; i += 8) {
-    queue->push(&buffer[i]);
+    read_queue.push(&buffer[i]);
   }
   mtx.unlock();
 }
 
-void write_task(FILE **file, uint8_t *buffer,
-                std::map<uint8_t *, callback_container> *write_queue,
-                uint32_t num_bytes, uint64_t *current_length,
-                uint64_t *total_length) {
-  /*
-  int write_size;
-  if (*current_length + num_bytes <= *total_length) {
-    write_size = num_bytes;
-  } else {
-    write_size = *total_length - *current_length;
-  }*/
-
-  if (!fwrite(buffer, num_bytes, 1, *file)) {
+void write_task(uint8_t *buffer, uint32_t num_bytes) {
+  if (!fwrite(buffer, num_bytes, 1, out_file)) {
     printf("Error: could not write block starting at %lu. %s.\n",
-           *current_length, strerror(errno));
+           processed_length, strerror(errno));
     exit(-7);
   }
 
   mtx.lock();
-  write_queue->erase(buffer);
+  write_queue.erase(buffer);
   mtx.unlock();
 }
 

@@ -20,13 +20,8 @@ void PKCS5_padding(uint8_t *in_block, uint8_t *out_block, int mode);
 
 void encrypt_task(uint8_t *block);
 void decrypt_task(uint8_t *block);
-void write_task(FILE **file, uint8_t *buffer,
-                std::map<uint8_t *, callback_container> *write_queue,
-                uint32_t num_bytes, uint64_t *current_length,
-                uint64_t *total_length);
-void read_task(FILE **file, uint8_t *buffer,
-               std::priority_queue<uint8_t *> *queue, uint32_t num_bytes,
-               uint64_t *current_length, uint64_t *total_length);
+void read_task(uint8_t *buffer, uint32_t num_bytes);
+void write_task(uint8_t *buffer, uint32_t num_bytes);
 void thread_dispatcher(void (*operation)(uint8_t *, uint8_t *));
 
 /* Driving function. The crypto function accepts the parsed user inputs from *
