@@ -12,10 +12,9 @@
  - Documentation with Doxygen
  - Consider building as a <popular *nix package manager> package.
  - Cross-platform compatible with Windows and OSX
- - Implement header file for use as a library
 
 ### DONE ###
  - Fix 64 bit truncation at EOF
  - Full TDES implementation DES -> TDES
- - Multithreading for concurrent encryption/decryption
+ - Multithreading for parallel encryption/decryption
  - Lower memory cost: read and write x number of bytes at a time

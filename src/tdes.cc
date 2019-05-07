@@ -94,6 +94,8 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   open_file(&in_file, *in_file_name, "rb", &in_file_length);
   open_file(&out_file, *out_file_name, "wb", NULL);
 
+  startup_notice();
+
   init_keys(&keygen, K1, K2, K3, mode);
 
   print_progress(0, mode);

@@ -37,7 +37,7 @@
 #include <mutex>
 #include <string>
 
-static std::mutex progress_mtx;
+#define VERSION_NO "1.0.0"
 
 int is_original_file(const char *filename) {
   struct stat st;
@@ -79,6 +79,16 @@ static void toggle_visible_input() {
   }
 }
 
+void startup_notice() {
+  std::cout
+      << "tdes " << VERSION_NO
+      << "  Copyright (C) 2019 Zachary Mohling. This program "
+         "comes with \nABSOLUTELY NO WARRANTY. This "
+         "is free software, and you are welcome to \nredistribute it under "
+         "certain conditions.\n"
+      << std::endl;
+}
+
 void prompt_password(std::string *out_password, int mode) {
   int c, password_size = 32, i = 0;
   std::string password, confirmed_password;
@@ -86,14 +96,12 @@ void prompt_password(std::string *out_password, int mode) {
   toggle_visible_input();
 
   if (mode == 0) {
-    std::cout << "*** Warning: The encrypted file will be unrecoverable "
-                 "without this password ***"
+    std::cout << "*** Caution: Reuse of a key will eventuate to a rollover ***"
               << std::endl;
   } else {
-    std::cout
-        << "*** Warning: Decrypting with the incorrect password can cause file "
-           "corruption ***"
-        << std::endl;
+    std::cout << "*** Warning: Decrypting with the incorrect key will corrupt "
+                 "output file ***"
+              << std::endl;
   }
 
   /* Prompt user for password and parse/store it */
@@ -124,8 +132,6 @@ void prompt_password(std::string *out_password, int mode) {
 
 void print_progress(int _progress, int mode) {
   static int progress = -1, init = 0;
-
-  // progress_mtx.lock();
 
   /* Prevent printing if percentage hasn't changed */
   if (_progress <= progress)
@@ -166,8 +172,6 @@ void print_progress(int _progress, int mode) {
     std::cout << std::endl;
     toggle_visible_input();
   }
-
-  // progress_mtx.unlock();
 }
 
 #endif  // IO_H_
