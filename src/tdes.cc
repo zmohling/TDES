@@ -94,7 +94,12 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   open_file(&in_file, *in_file_name, "rb", &in_file_length);
   open_file(&out_file, *out_file_name, "wb", NULL);
 
+  startup_notice();
+
   init_keys(&keygen, K1, K2, K3, mode);
+
+  /* Benchmarking */
+  // auto benchmark_start = std::chrono::high_resolution_clock::now();
 
   print_progress(0, mode);
 
@@ -115,7 +120,9 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   }
 
   /* Thread pool for encryption and decryption operations */
-  ThreadPool pool(8);
+  unsigned num_threads = std::thread::hardware_concurrency();
+  if (num_threads == 0) num_threads = 4;
+  ThreadPool pool(num_threads - 1);
 
   static int init = 0;
   while (true) {
@@ -208,6 +215,16 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   fclose(in_file);
 
   fclose(out_file);
+
+  /* Benchmarking */
+  /*
+  auto benchmark_end = std::chrono::high_resolution_clock::now();
+  double elapsed_milliseconds =
+      std::chrono::duration<double, std::milli>(benchmark_end -
+  benchmark_start).count(); double bytes_per_second =
+      ((double)in_file_length) / (elapsed_milliseconds / 1000.0);
+  std::cout << bytes_per_second << " bytes/second" << std::endl;
+  */
 }
 
 /* Initialize set of keys for Triple DES. Derives the cumulative 24    *

@@ -43,22 +43,23 @@ int main(int argc, char *argv[]) {
   int mode = 0;  // 0 for encrypt, 1 for decrypt
   std::string in_file_name(argv[2]), out_file_name(argv[3]);
 
-  if (does_option_exist(argv, argv + argc, "-enc")) {
+  if (does_option_exist(argv, argv + argc, "-enc") ||
+      does_option_exist(argv, argv + argc, "--encrypt")) {
     mode = 0;
-  } else if (does_option_exist(argv, argv + argc, "-dec")) {
+  } else if (does_option_exist(argv, argv + argc, "-dec") ||
+             does_option_exist(argv, argv + argc, "--decrypt")) {
     mode = 1;
   } else {
     fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
     return -2;
   }
 
-  /*
-    if (is_original_file(out_file_name.c_str())) {
-      fprintf(stderr, "Aborting. This file already exists: %s\n",
-              out_file_name.c_str());
-      exit(-1);
-    }
-  */
+  /* Check if output file is original file */
+  if (strcmp(in_file_name.c_str(), out_file_name.c_str()) == 0) {
+    fprintf(stderr, "Aborting. Refusing to overwrite original file: %s\n",
+            in_file_name.c_str());
+    exit(-1);
+  }
 
   run(mode, &in_file_name, &out_file_name);
 }

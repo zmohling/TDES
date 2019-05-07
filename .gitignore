@@ -1,11 +1,13 @@
 # Project specific paths
-tdes
-build/
-data/temp
-tests/tests
 *.mp4
 *.txt
+
+tdes
+build/
+LICENSE_HEAD
 CPPLINT.cfg
+.base
+/tools/scripts
 
 # Debuggin
 valgrind*
@@ -37,7 +39,6 @@ core
 *.lai
 *.la
 *.a
-*.lib
 
 # Executables
 *.exe
