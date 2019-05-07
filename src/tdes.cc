@@ -74,12 +74,12 @@ static void update_progress(int mode) {
  * password, opens files, allocates buffer. Contains loop for reading *
  * in data, adding jobs to the thread pool, and writing data.         */
 void run(int mode, std::string *in_file_name, std::string *out_file_name) {
+  open_file(&in_file, *in_file_name, "rb", &in_file_length);
+  open_file(&out_file, *out_file_name, "wb", NULL);
+
   init_keys(&keygen, K1, K2, K3, mode);
 
   print_progress(0, mode);
-
-  open_file(&in_file, *in_file_name, "rb", &in_file_length);
-  open_file(&out_file, *out_file_name, "wb", NULL);
 
   /* Adjust write_length if encrypting for padding */
   if (mode == 0) {

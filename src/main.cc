@@ -23,6 +23,7 @@
 #include <string.h>
 #include <algorithm>
 #include <bitset>
+#include <ctime>
 #include <iostream>
 #include <vector>
 
@@ -60,6 +61,7 @@ int main(int argc, char *argv[]) {
       exit(-1);
     }
   */
+
   run(mode, &in_file_name, &out_file_name);
 }
 
