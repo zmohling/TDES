@@ -45,6 +45,16 @@ int file_exists(const char *filename) {
   return result == 0;
 }
 
+void startup_notice() {
+  std::cout
+      << "tdes " << VERSION_NO
+      << " Copyright (C) 2019 Zachary Mohling. This program "
+         "comes with \nABSOLUTELY NO WARRANTY. This "
+         "is free software, and you are welcome to \nredistribute it under "
+         "certain conditions.\n"
+      << std::endl;
+}
+
 void open_file(FILE **file, std::string path, const char *mode,
                uint64_t *total_length) {
   if (!(*file = fopen(path.c_str(), mode))) {
@@ -77,16 +87,6 @@ static void toggle_visible_input() {
 
     stalled = !stalled;
   }
-}
-
-void startup_notice() {
-  std::cout
-      << "tdes " << VERSION_NO
-      << "  Copyright (C) 2019 Zachary Mohling. This program "
-         "comes with \nABSOLUTELY NO WARRANTY. This "
-         "is free software, and you are welcome to \nredistribute it under "
-         "certain conditions.\n"
-      << std::endl;
 }
 
 void prompt_password(std::string *out_password, int mode) {

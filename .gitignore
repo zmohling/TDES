@@ -7,7 +7,7 @@ build/
 LICENSE_HEAD
 CPPLINT.cfg
 .base
-/tools/scripts
+tools/
 
 # Debuggin
 valgrind*

@@ -17,6 +17,7 @@
 
 #include "tdes.h"
 
+#include <math.h>
 #include <chrono>
 #include <map>
 #include <mutex>
@@ -91,12 +92,12 @@ static void update_progress(int mode) {
  * password, opens files, allocates buffer. Contains loop for reading *
  * in data, adding jobs to the thread pool, and writing data.         */
 void run(int mode, std::string *in_file_name, std::string *out_file_name) {
-  open_file(&in_file, *in_file_name, "rb", &in_file_length);
-  open_file(&out_file, *out_file_name, "wb", NULL);
-
   startup_notice();
 
   init_keys(&keygen, K1, K2, K3, mode);
+
+  open_file(&in_file, *in_file_name, "rb", &in_file_length);
+  open_file(&out_file, *out_file_name, "wb", NULL);
 
   /* Benchmarking */
   // auto benchmark_start = std::chrono::high_resolution_clock::now();
@@ -220,10 +221,11 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   /*
   auto benchmark_end = std::chrono::high_resolution_clock::now();
   double elapsed_milliseconds =
-      std::chrono::duration<double, std::milli>(benchmark_end -
-  benchmark_start).count(); double bytes_per_second =
-      ((double)in_file_length) / (elapsed_milliseconds / 1000.0);
-  std::cout << bytes_per_second << " bytes/second" << std::endl;
+      std::chrono::duration<double, std::milli>(benchmark_end - benchmark_start)
+          .count();
+  double bytes_per_second =
+      ((double)in_file_length / pow(2, 20)) / (elapsed_milliseconds / 1000.0);
+  std::cout << bytes_per_second << " MiB/s" << std::endl;
   */
 }
 

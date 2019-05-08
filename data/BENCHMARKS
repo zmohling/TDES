@@ -1,24 +1,18 @@
-video.mp4
-05/04/2019 - 28993 milliseconds
-05/07/2019 - 17683 milliseconds
-
-bee_movie_script.txt
-05/04/2019 - 294 milliseconds
-05/07/2019 - 163 milliseconds
-
 ### BENCHMARKS ###
 
-# CPU STATS #
-CPU: Intel i7-3770K
-NUM CORES: 4
-NUM THREADS: 8
-CACHE: 8 MB
-FREQ: 4100 MHz 
-
-# RESULTS #
+## RESULTS ##
 CRITERIA: Mean average of 4 trials, constant test files
 UNIT: bytes/second
 
 05/04/2019 - 197496
 05/07/2019 - 334956
 
+
+## CPU STATS ##
+CPU: Intel i7-3770K
+NUM CORES: 4
+NUM THREADS: 8
+CACHE: 8 MB
+FREQ: 4100 MHz 
+
+## DISK STATS ##
