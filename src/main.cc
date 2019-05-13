@@ -29,46 +29,6 @@
 
 #include "tdes.h"
 
-static bool does_option_exist(char **begin, char **end,
-                              const std::string &option) {
-  return std::find(begin, end, option) != end;
-}
-
-int main(int argc, char *argv[]) {
-  // encryption_test();
-  // return 0;
-
-  if (argc != 4) {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -1;
-  }
-
-  int mode = 0;  // 0 for encrypt, 1 for decrypt
-  std::string in_file_name(argv[2]), out_file_name(argv[3]);
-
-  if (does_option_exist(argv, argv + argc, "-enc") ||
-      does_option_exist(argv, argv + argc, "--encrypt")) {
-    mode = 0;
-  } else if (does_option_exist(argv, argv + argc, "-dec") ||
-             does_option_exist(argv, argv + argc, "--decrypt")) {
-    mode = 1;
-  } else {
-    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
-    return -2;
-  }
-
-  /* Check if output file is original file */
-  if (strcmp(in_file_name.c_str(), out_file_name.c_str()) == 0) {
-    fprintf(stderr, "Aborting. Refusing to overwrite original file: %s\n",
-            in_file_name.c_str());
-    exit(-1);
-  }
-
-  run(mode, &in_file_name, &out_file_name);
-}
-
-/*
- *
 // Validation code
 std::string sub_keys_str[16] = {
     "111000001011111001100110000100110010101010000010",
@@ -175,4 +135,41 @@ static void encryption_test() {
     }
   }
 }
-*/
+
+static bool does_option_exist(char **begin, char **end,
+                              const std::string &option) {
+  return std::find(begin, end, option) != end;
+}
+
+int main(int argc, char *argv[]) {
+  //  encryption_test();
+  // return 0;
+
+  if (argc != 4) {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -1;
+  }
+
+  int mode = 0;  // 0 for encrypt, 1 for decrypt
+  std::string in_file_name(argv[2]), out_file_name(argv[3]);
+
+  if (does_option_exist(argv, argv + argc, "-enc") ||
+      does_option_exist(argv, argv + argc, "--encrypt")) {
+    mode = 0;
+  } else if (does_option_exist(argv, argv + argc, "-dec") ||
+             does_option_exist(argv, argv + argc, "--decrypt")) {
+    mode = 1;
+  } else {
+    fprintf(stderr, "Incorrect usage: tdes [-enc|-dec] <source> <dest>\n");
+    return -2;
+  }
+
+  /* Check if output file is original file */
+  if (strcmp(in_file_name.c_str(), out_file_name.c_str()) == 0) {
+    fprintf(stderr, "Aborting. Refusing to overwrite original file: %s\n",
+            in_file_name.c_str());
+    exit(-1);
+  }
+
+  run(mode, &in_file_name, &out_file_name);
+}

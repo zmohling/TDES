@@ -100,7 +100,7 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   open_file(&out_file, *out_file_name, "wb", NULL);
 
   /* Benchmarking */
-  // auto benchmark_start = std::chrono::high_resolution_clock::now();
+  auto benchmark_start = std::chrono::high_resolution_clock::now();
 
   print_progress(0, mode);
 
@@ -218,7 +218,7 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   fclose(out_file);
 
   /* Benchmarking */
-  /*
+
   auto benchmark_end = std::chrono::high_resolution_clock::now();
   double elapsed_milliseconds =
       std::chrono::duration<double, std::milli>(benchmark_end - benchmark_start)
@@ -226,7 +226,6 @@ void run(int mode, std::string *in_file_name, std::string *out_file_name) {
   double bytes_per_second =
       ((double)in_file_length / pow(2, 20)) / (elapsed_milliseconds / 1000.0);
   std::cout << bytes_per_second << " MiB/s" << std::endl;
-  */
 }
 
 /* Initialize set of keys for Triple DES. Derives the cumulative 24    *

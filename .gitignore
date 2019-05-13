@@ -9,8 +9,9 @@ CPPLINT.cfg
 .base
 tools/
 
-# Debuggin
+# Debugging
 valgrind*
+callgrind*
 core
 
 # Prerequisites

@@ -29,7 +29,7 @@ INC_DIRS=$(SRC_BASE_DIR)
 INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 
 # Compilation and linking flags
-DEBUG_FLAGS=-O3
+DEBUG_FLAGS=-Wall -Wextra -ggdb3 -Og
 RELEASE_FLAGS=-O3
 C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
 CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11 -pthread
@@ -61,7 +61,7 @@ $(BUILD_DIR)/%.o: $(SRC_SUB_DIRS)%.cc | $(BUILD_DIR)
 .PHONY: clean lint install uninstall
 clean:
 	@$(ECHO) Removing all generated files and executables...
-	@$(RM) $(BUILD_DIR) $(BIN) *.txt *.mp4 core vgcore.* valgrind*
+	@$(RM) $(BUILD_DIR) $(BIN) *.txt *.mp4 core vgcore.* valgrind* callgrind*
 
 lint:
 	@$(ECHO) Linting source files per Google\'s CXX Styleguide...
