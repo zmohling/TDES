@@ -29,9 +29,10 @@ INC_DIRS=$(SRC_BASE_DIR)
 INC_FLAGS=$(foreach d, $(INC_DIRS), -I$d)
 
 # Compilation and linking flags
-DEBUG_FLAGS=-Wall -ggdb3
-C_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS)
-CXX_FLAGS=$(INC_FLAGS) $(DEBUG_FLAGS) -std=c++11 -pthread
+DEBUG_FLAGS=-Wall -ggdb3 -Og
+RELEASE_FLAGS=-O3
+C_FLAGS=$(INC_FLAGS) $(RELEASE_FLAGS)
+CXX_FLAGS=$(INC_FLAGS) $(RELEASE_FLAGS) -std=c++11 -pthread
 LD_FLAGS=-lm -lpthread -lssl -lcrypto
 
 # Sources, objects, and dependencies
@@ -45,7 +46,7 @@ all: $(BIN)
 
 $(BIN): $(OBJ)
 	@$(ECHO) Linking compiled files... 
-	@$(CXX) $(LD_FLAGS) $^ -o $(@F)
+	@$(CXX) $^ -o $(@F) $(LD_FLAGS)
 
 -include $(DEP)
 
