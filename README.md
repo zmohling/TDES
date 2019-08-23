@@ -3,7 +3,7 @@
 # TDES
 An implementation of the [Triple Data Encryption Standard](https://en.wikipedia.org/wiki/Data_Encryption_Standard) (TDES) specification as a Linux and OSX command-line tool.
 
-![demo.gif](https://raw.githubusercontent.com/zmohling/TDES/master/data/demo.gif)
+<center><img src="https://raw.githubusercontent.com/zmohling/TDES/master/data/demo.gif"></center>
 
 ### Purpose
 This project served as a personal introduction to cryptographic block ciphers, symmetrical encryption, and the general paradigm of security-first software development.
@@ -13,6 +13,7 @@ This project served as a personal introduction to cryptographic block ciphers, s
 `
 ### Installation
 `make && sudo make install
+`
 
 ### Dependencies
 * g++
