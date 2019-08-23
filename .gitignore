@@ -9,6 +9,9 @@ CPPLINT.cfg
 .base
 /tools/scripts
 
+# OSX
+.DS_Store
+
 # Debuggin
 valgrind*
 core
