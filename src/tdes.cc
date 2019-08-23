@@ -262,7 +262,7 @@ void read_task(uint8_t *buffer, uint32_t num_bytes) {
   }
 
   if (!fread(buffer, read_size, 1, in_file)) {
-    printf("Error: could not read block starting at %lu. %s.\n", read_length,
+    printf("Error: could not read block starting at %llu. %s.\n", read_length,
            strerror(errno));
     exit(-7);
   }
@@ -282,7 +282,7 @@ void read_task(uint8_t *buffer, uint32_t num_bytes) {
  * pointer to that chunk.                                               */
 void write_task(uint8_t *buffer, uint32_t num_bytes) {
   if (!fwrite(buffer, num_bytes, 1, out_file)) {
-    printf("Error: could not write block starting at %lu. %s.\n", write_length,
+    printf("Error: could not write block starting at %llu. %s.\n", write_length,
            strerror(errno));
     exit(-7);
   }

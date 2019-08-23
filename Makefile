@@ -35,6 +35,13 @@ C_FLAGS=$(INC_FLAGS) $(RELEASE_FLAGS)
 CXX_FLAGS=$(INC_FLAGS) $(RELEASE_FLAGS) -std=c++11 -pthread
 LD_FLAGS=-lm -lpthread -lssl -lcrypto
 
+ifeq ($(shell uname -s),Darwin)
+	OPENSSL_DIR=$(shell brew --prefix openssl)
+
+	LD_FLAGS += -L$(OPENSSL_DIR)/lib 
+	CXX_FLAGS += -I$(OPENSSL_DIR)/include
+endif
+
 # Sources, objects, and dependencies
 C_SRC=$(shell find $(SRC_BASE_DIR) -name '*.c')
 CXX_SRC=$(shell find $(SRC_BASE_DIR) -name '*.cc')
